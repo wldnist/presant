@@ -114,7 +114,8 @@ export default function NewEventInstancePage() {
         end_time: formData.end_time || undefined,
         recurrence_type: formData.recurrence_type,
         recurrence_end_date: formData.recurrence_end_date || undefined,
-        registered_participants: formData.registered_participants
+        registered_participants: formData.registered_participants,
+        status: 'published' as const
       };
 
       await eventInstanceService.createEventInstance(eventInstanceData);
