@@ -5,8 +5,12 @@ import {
   EventService, 
   UserService,
   MasterEventService,
-  EventInstanceService
+  EventInstanceService,
+  AttendanceSubmission
 } from '@/services/interfaces';
+import { Attendance } from '@/types';
+import moment from 'moment';
+import 'moment/locale/id';
 import { 
   AttendanceRecord, 
   Participant, 
@@ -26,6 +30,43 @@ import {
 } from '@/data/mockData';
 
 export class MockAttendanceService implements AttendanceService {
+  async getRegisteredParticipantsWithAttendance(eventId: string): Promise<AttendanceRecord[]> {
+    // Find the event instance
+    const eventInstance = mockEventInstances.find(inst => inst.id === eventId);
+    if (!eventInstance) throw new Error('Event instance not found');
+    
+    // Get all registered participants
+    const registeredParticipants = eventInstance.registered_participants
+      .map(participantId => mockParticipants.find(p => p.uuid === participantId))
+      .filter((p): p is Participant => p !== undefined);
+    
+    // Get existing attendance records for this event
+    const existingAttendance = mockAttendance.filter(a => a.eventId === eventId);
+    
+    // Create attendance map
+    const attendanceMap = new Map();
+    existingAttendance.forEach(att => {
+      attendanceMap.set(att.participantId, att);
+    });
+    
+    // Return all registered participants with their attendance status
+    return registeredParticipants.map(participant => {
+      const existingAtt = attendanceMap.get(participant.id);
+      
+      return {
+        participant,
+        attendance: existingAtt || {
+          id: `temp-${participant.id}-${eventId}`,
+          eventId,
+          participantId: participant.id,
+          status: 'absent' as AttendanceStatus,
+          timestamp: new Date(),
+          notes: ''
+        }
+      };
+    });
+  }
+
   async getAttendanceByEvent(eventId: string): Promise<AttendanceRecord[]> {
     const eventAttendance = mockAttendance.filter(a => a.eventId === eventId);
     
@@ -79,6 +120,51 @@ export class MockAttendanceService implements AttendanceService {
     }
     
     return allRecords.filter(record => record.attendance.status === status);
+  }
+
+  async submitAttendance(attendanceData: AttendanceSubmission[]): Promise<void> {
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Implement upsert logic: update existing or create new
+    attendanceData.forEach(submission => {
+      // Find existing attendance record
+      const existingIndex = mockAttendance.findIndex(att => 
+        att.eventId === submission.event_id && att.participantId === submission.participant_id
+      );
+      
+      if (existingIndex !== -1) {
+        // Update existing record
+        mockAttendance[existingIndex] = {
+          ...mockAttendance[existingIndex],
+          status: submission.status,
+          timestamp: new Date(submission.timestamp)
+        };
+      } else {
+        // Create new record
+        const newAttendance: Attendance = {
+          id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          eventId: submission.event_id,
+          participantId: submission.participant_id,
+          status: submission.status,
+          timestamp: new Date(submission.timestamp)
+        };
+        mockAttendance.push(newAttendance);
+      }
+    });
+    
+    console.log('Attendance submitted and saved:', attendanceData);
+  }
+
+  async getAllAttendance(): Promise<AttendanceSubmission[]> {
+    // Return all attendance records for reporting
+    return mockAttendance.map(att => ({
+      event_id: att.eventId,
+      participant_id: att.participantId,
+      status: att.status,
+      timestamp: att.timestamp.toISOString(),
+      notes: ''
+    }));
   }
 }
 
@@ -278,14 +364,18 @@ export class MockEventInstanceService implements EventInstanceService {
 
   // Helper function to check if an event is active today based on recurrence
   isEventActiveToday(eventInstance: EventInstance): boolean {
-    const today = new Date();
-    const todayString = today.toISOString().split('T')[0];
-    const startDate = new Date(eventInstance.start_date);
-    const endDate = eventInstance.recurrence_end_date ? new Date(eventInstance.recurrence_end_date) : null;
+    const today = moment();
+    const todayString = today.format('YYYY-MM-DD');
+    const startDate = moment(eventInstance.start_date);
+    const endDate = eventInstance.recurrence_end_date ? moment(eventInstance.recurrence_end_date) : null;
 
     // Check if today is within the event period
-    if (today < startDate) return false;
-    if (endDate && today > endDate) return false;
+    if (today.isBefore(startDate, 'day')) {
+      return false;
+    }
+    if (endDate && today.isAfter(endDate, 'day')) {
+      return false;
+    }
 
     // If no recurrence, check if today matches the start date
     if (eventInstance.recurrence_type === 'none' || !eventInstance.recurrence_type) {
@@ -299,14 +389,14 @@ export class MockEventInstanceService implements EventInstanceService {
       
       case 'weekly':
         // Check if today is the same day of week as start date
-        const startDayOfWeek = startDate.getDay();
-        const todayDayOfWeek = today.getDay();
+        const startDayOfWeek = startDate.day();
+        const todayDayOfWeek = today.day();
         return startDayOfWeek === todayDayOfWeek;
       
       case 'monthly':
         // Check if today is the same day of month as start date
-        const startDayOfMonth = startDate.getDate();
-        const todayDayOfMonth = today.getDate();
+        const startDayOfMonth = startDate.date();
+        const todayDayOfMonth = today.date();
         return startDayOfMonth === todayDayOfMonth;
       
       default:

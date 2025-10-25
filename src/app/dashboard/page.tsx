@@ -4,9 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AttendanceRecord, AttendanceStatus, EventInstance } from '@/types';
 import { MockAttendanceService, MockEventInstanceService } from '@/services/mockServices';
+import { AttendanceSubmission } from '@/services/interfaces';
 import { debounce } from '@/utils/attendanceUtils';
-import { formatEventDate } from '@/utils/eventUtils';
+import moment from 'moment';
+import 'moment/locale/id';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import SimpleModal from '@/components/SimpleModal';
+import { useSimpleModal } from '@/hooks/useSimpleModal';
 
 // Components
 import SearchBar from '@/components/SearchBar';
@@ -29,6 +33,8 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const { modalState, showModal, hideModal } = useSimpleModal();
 
   // Load events
   useEffect(() => {
@@ -48,29 +54,29 @@ export default function DashboardPage() {
     loadEvents();
   }, []);
 
+  const loadAttendanceData = useCallback(async () => {
+    if (!currentEvent) {
+      setRecords([]);
+      setFilteredRecords([]);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const attendanceRecords = await attendanceService.getRegisteredParticipantsWithAttendance(currentEvent.id);
+      setRecords(attendanceRecords);
+      setFilteredRecords(attendanceRecords);
+    } catch (error) {
+      console.error('Error loading attendance data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentEvent]);
+
   // Load attendance data when event changes
   useEffect(() => {
-    const loadAttendanceData = async () => {
-      if (!currentEvent) {
-        setRecords([]);
-        setFilteredRecords([]);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const attendanceRecords = await attendanceService.getAttendanceByEvent(currentEvent.id);
-        setRecords(attendanceRecords);
-        setFilteredRecords(attendanceRecords);
-      } catch (error) {
-        console.error('Error loading attendance data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadAttendanceData();
-  }, [currentEvent]);
+  }, [loadAttendanceData]);
 
   // Handle event change
   const handleEventChange = (event: EventInstance | null) => {
@@ -78,6 +84,38 @@ export default function DashboardPage() {
     setActiveFilter('all');
     setGenderFilter('all');
     setSearchQuery('');
+  };
+
+  // Submit attendance
+  const handleSubmitAttendance = async () => {
+    if (!currentEvent) return;
+    
+    try {
+      setSubmitting(true);
+      
+      // Submit all current attendance records
+      const attendanceData: AttendanceSubmission[] = filteredRecords.map(record => ({
+        event_id: currentEvent.uuid,
+        participant_id: record.participant.uuid,
+        status: record.attendance.status,
+        timestamp: new Date().toISOString(),
+        notes: ''
+      }));
+      
+      await attendanceService.submitAttendance(attendanceData);
+      
+      // Show success message
+      showModal('Berhasil!', 'Kehadiran berhasil disimpan!', 'success', hideModal);
+      
+      // Reload records to reflect changes
+      loadAttendanceData();
+      
+    } catch (error) {
+      console.error('Error submitting attendance:', error);
+      showModal('Error!', 'Gagal menyimpan kehadiran. Silakan coba lagi.', 'error', hideModal);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Debounced search function
@@ -173,47 +211,41 @@ export default function DashboardPage() {
     }
   };
 
-  // Handle status change
-  const handleStatusChange = async (participantId: string, status: AttendanceStatus) => {
-    try {
-      await attendanceService.updateAttendanceStatus(participantId, currentEvent!.id, status);
-      
-      // Update local state
-      const updatedRecords = records.map(record => {
-        if (record.participant.id === participantId) {
-          return {
-            ...record,
-            attendance: {
-              ...record.attendance,
-              status,
-              timestamp: new Date()
-            }
-          };
-        }
-        return record;
-      });
-      
-      setRecords(updatedRecords);
-      
-      // Update filtered records
-      const updatedFilteredRecords = filteredRecords.map(record => {
-        if (record.participant.id === participantId) {
-          return {
-            ...record,
-            attendance: {
-              ...record.attendance,
-              status,
-              timestamp: new Date()
-            }
-          };
-        }
-        return record;
-      });
-      
-      setFilteredRecords(updatedFilteredRecords);
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
+  // Handle status change (local only, no auto-submit)
+  const handleStatusChange = (participantId: string, status: AttendanceStatus) => {
+    // Update local state only, no server call
+    const updatedRecords = records.map(record => {
+      if (record.participant.id === participantId) {
+        return {
+          ...record,
+          attendance: {
+            ...record.attendance,
+            status,
+            timestamp: new Date()
+          }
+        };
+      }
+      return record;
+    });
+    
+    setRecords(updatedRecords);
+    
+    // Update filtered records
+    const updatedFilteredRecords = filteredRecords.map(record => {
+      if (record.participant.id === participantId) {
+        return {
+          ...record,
+          attendance: {
+            ...record.attendance,
+            status,
+            timestamp: new Date()
+          }
+        };
+      }
+      return record;
+    });
+    
+    setFilteredRecords(updatedFilteredRecords);
   };
 
   if (eventsLoading) {
@@ -243,7 +275,40 @@ export default function DashboardPage() {
                     Kelola kehadiran peserta acara
                   </p>
                 </div>
-                <div className="mt-4 sm:mt-0">
+                <div className="mt-4 sm:mt-0 flex items-center space-x-3">
+                  {currentEvent && (
+                    <button
+                      onClick={handleSubmitAttendance}
+                      disabled={submitting}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors duration-200"
+                    >
+                      {submitting ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Menyimpan...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Submit Kehadiran
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => router.push('/reports')}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                  >
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Laporan
+                  </button>
                   <button
                     onClick={() => router.push('/')}
                     className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
@@ -271,7 +336,7 @@ export default function DashboardPage() {
                 Tidak ada acara yang dijadwalkan untuk hari ini. Silakan kembali lagi besok atau hubungi administrator untuk informasi lebih lanjut.
               </p>
               <div className="text-sm text-gray-500 mb-8">
-                📅 {formatEventDate(new Date().toISOString().split('T')[0])}
+                📅 {moment().format('dddd, DD MMMM YYYY')}
               </div>
 
               {/* Action Buttons */}
@@ -347,6 +412,30 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="mt-4 sm:mt-0 flex items-center space-x-3">
+                {currentEvent && (
+                  <button
+                    onClick={handleSubmitAttendance}
+                    disabled={submitting}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors duration-200"
+                  >
+                    {submitting ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Menyimpan...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Submit Kehadiran
+                      </>
+                    )}
+                  </button>
+                )}
                 <button
                   onClick={() => router.push('/')}
                   className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
@@ -496,6 +585,17 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      
+      {/* Modal */}
+      <SimpleModal
+        isOpen={modalState.isOpen}
+        type={modalState.type}
+        title={modalState.title}
+        message={modalState.message}
+        onConfirm={modalState.onConfirm}
+        onCancel={modalState.onCancel}
+        onClose={hideModal}
+      />
     </ProtectedRoute>
   );
 }

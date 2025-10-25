@@ -94,40 +94,6 @@ export default function EventInstancesPage() {
     );
   };
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'published':
-        return 'bg-green-100 text-green-800';
-      case 'draft':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'ongoing':
-        return 'bg-blue-100 text-blue-800';
-      case 'completed':
-        return 'bg-gray-100 text-gray-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'published':
-        return 'Dipublikasi';
-      case 'draft':
-        return 'Draft';
-      case 'ongoing':
-        return 'Berlangsung';
-      case 'completed':
-        return 'Selesai';
-      case 'cancelled':
-        return 'Dibatalkan';
-      default:
-        return status;
-    }
-  };
-
   const getRecurrenceLabel = (recurrenceType: string) => {
     switch (recurrenceType) {
       case 'daily':
@@ -237,9 +203,6 @@ export default function EventInstancesPage() {
                       Pengulangan
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Peserta
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -287,11 +250,6 @@ export default function EventInstancesPage() {
                             Sampai {moment(eventInstance.recurrence_end_date).locale('id').format('DD MMM YYYY')}
                           </div>
                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(eventInstance.status)}`}>
-                          {getStatusLabel(eventInstance.status)}
-                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">

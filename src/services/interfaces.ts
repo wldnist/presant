@@ -13,9 +13,20 @@ import {
 // Domain Services
 export interface AttendanceService {
   getAttendanceByEvent(eventId: string): Promise<AttendanceRecord[]>;
+  getRegisteredParticipantsWithAttendance(eventId: string): Promise<AttendanceRecord[]>;
   updateAttendanceStatus(participantId: string, eventId: string, status: AttendanceStatus): Promise<void>;
   searchParticipants(query: string, eventId: string): Promise<AttendanceRecord[]>;
   filterByStatus(status: AttendanceStatus | 'all', eventId: string): Promise<AttendanceRecord[]>;
+  submitAttendance(attendanceData: AttendanceSubmission[]): Promise<void>;
+  getAllAttendance(): Promise<AttendanceSubmission[]>;
+}
+
+export interface AttendanceSubmission {
+  event_id: string;
+  participant_id: string;
+  status: AttendanceStatus;
+  timestamp: string;
+  notes: string;
 }
 
 export interface ParticipantService {

@@ -41,13 +41,7 @@ export default function NewEventInstancePage() {
         const allMasterEvents = await masterEventService.getAllMasterEvents();
         setMasterEvents(allMasterEvents);
         
-        // Set default master event if available
-        if (allMasterEvents.length > 0) {
-          setFormData(prev => ({
-            ...prev,
-            master_event_id: allMasterEvents[0].uuid
-          }));
-        }
+        // Don't auto-select master event - let user choose
       } catch (error) {
         console.error('Error loading master events:', error);
         showError('Gagal memuat master acara');

@@ -286,7 +286,7 @@ export default function EditMasterEventPage() {
                       onChange={(e) => setRequirementInput(e.target.value)}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-800 placeholder-gray-400 font-medium"
                       placeholder="Masukkan persyaratan"
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddRequirement())}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddRequirement())}
                     />
                     <button
                       type="button"
