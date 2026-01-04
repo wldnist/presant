@@ -5,7 +5,6 @@ import {
   Event, 
   Attendance,
   SystemUser,
-  UserRole,
   MasterEvent,
   EventInstance
 } from '@/types';

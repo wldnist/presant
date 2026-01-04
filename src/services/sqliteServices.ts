@@ -26,13 +26,6 @@ import {
   IAttendanceRepository,
   ISystemUserRepository
 } from '@/repositories/interfaces';
-import { ParticipantRepository } from '@/repositories/sqlite/ParticipantRepository';
-import { MasterEventRepository } from '@/repositories/sqlite/MasterEventRepository';
-import { EventInstanceRepository } from '@/repositories/sqlite/EventInstanceRepository';
-import { AttendanceRepository } from '@/repositories/sqlite/AttendanceRepository';
-import { SystemUserRepository } from '@/repositories/sqlite/SystemUserRepository';
-import moment from 'moment';
-import 'moment/locale/id';
 
 export class SqliteAttendanceService implements AttendanceService {
   constructor(
@@ -221,13 +214,13 @@ export class SqliteEventService implements EventService {
     };
   }
 
-  async createEvent(event: Omit<Event, 'id'>): Promise<Event> {
+  async createEvent(_event: Omit<Event, 'id'>): Promise<Event> {
     // This is a legacy method - Event is now EventInstance
     // We'll need a master event to create an instance
     throw new Error('Use EventInstanceService instead');
   }
 
-  async updateEvent(id: string, event: Partial<Event>): Promise<Event> {
+  async updateEvent(_id: string, _event: Partial<Event>): Promise<Event> {
     throw new Error('Use EventInstanceService instead');
   }
 

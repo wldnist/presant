@@ -22,7 +22,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching event instance:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch event instance' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch event instance' },
       { status: 500 }
     );
   }
