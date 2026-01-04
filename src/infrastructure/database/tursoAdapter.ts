@@ -2,6 +2,10 @@
 // Note: Turso menggunakan async API, tapi kita buat wrapper untuk kompatibilitas
 
 import { Client } from '@libsql/client';
+import { DatabaseInstance } from './db';
+
+// Type untuk SQL parameter values (sesuai dengan @libsql/client)
+type SqlValue = string | number | bigint | boolean | null | Uint8Array;
 
 type Statement = {
   run: (...params: unknown[]) => { changes: number; lastInsertRowid: number | bigint } | Promise<{ changes: number; lastInsertRowid: number | bigint }>;
@@ -62,7 +66,7 @@ export function createTursoAdapter(client: Client) {
         run: async (...params: unknown[]) => {
           const result = await client.execute({
             sql: sqlStmt,
-            args: params as any
+            args: params as SqlValue[]
           });
           return {
             changes: result.rowsAffected,
@@ -73,7 +77,7 @@ export function createTursoAdapter(client: Client) {
         get: async (...params: unknown[]) => {
           const result = await client.execute({
             sql: sqlStmt,
-            args: params as any
+            args: params as SqlValue[]
           });
           return result.rows[0] || undefined;
         },
@@ -81,7 +85,7 @@ export function createTursoAdapter(client: Client) {
         all: async (...params: unknown[]) => {
           const result = await client.execute({
             sql: sqlStmt,
-            args: params as any
+            args: params as SqlValue[]
           });
           return result.rows;
         }
@@ -100,6 +104,11 @@ export function createTursoAdapter(client: Client) {
 }
 
 // Helper untuk check apakah database adalah Turso
-export function isTursoDatabase(db: any): boolean {
-  return db && typeof db.execute === 'function' && typeof db.prepare === 'function';
+export function isTursoDatabase(db: unknown): boolean {
+  return (
+    db !== null &&
+    typeof db === 'object' &&
+    '_isTurso' in db &&
+    (db as DatabaseInstance)._isTurso === true
+  );
 }
