@@ -3,12 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Participant } from '@/types';
-import { MockParticipantService } from '@/services/mockServices';
 import AppLayout from '@/components/AppLayout';
 import Pagination from '@/components/Pagination';
-
-// Services
-const participantService = new MockParticipantService();
+import { apiGet } from '@/utils/api';
 
 export default function ParticipantReportsPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -24,7 +21,7 @@ export default function ParticipantReportsPage() {
     const loadParticipants = async () => {
       try {
         setLoading(true);
-        const allParticipants = await participantService.getAllParticipants();
+        const allParticipants = await apiGet<Participant[]>('/participants');
         setParticipants(allParticipants);
         setFilteredParticipants(allParticipants);
       } catch (error) {

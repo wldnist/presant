@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AttendanceRecord, AttendanceStatus, EventInstance } from '@/types';
-import { MockAttendanceService, MockEventInstanceService } from '@/services/mockServices';
 import { AttendanceSubmission } from '@/services/interfaces';
 import { debounce } from '@/utils/attendanceUtils';
 import moment from 'moment';
@@ -11,16 +10,13 @@ import 'moment/locale/id';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
+import { apiGet, apiPost } from '@/utils/api';
 
 // Components
 import SearchBar from '@/components/SearchBar';
 import AttendanceLegend from '@/components/AttendanceLegend';
 import AttendanceGrid from '@/components/AttendanceGrid';
 import EventSelector from '@/components/EventSelector';
-
-// Services
-const attendanceService = new MockAttendanceService();
-const eventInstanceService = new MockEventInstanceService();
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -41,8 +37,33 @@ export default function DashboardPage() {
     const loadEvents = async () => {
       try {
         setEventsLoading(true);
-        // Ambil event instances yang aktif hari ini (dengan smart filtering berdasarkan recurrence)
-        const todayEvents = await eventInstanceService.getEventsActiveToday();
+        // Ambil semua event instances dan filter di client untuk yang aktif hari ini
+        const allEvents = await apiGet<EventInstance[]>('/event-instances');
+        const today = moment().format('YYYY-MM-DD');
+        const todayEvents = allEvents.filter(event => {
+          // Check if event is active today based on recurrence
+          if (event.recurrence_type === 'none' || !event.recurrence_type) {
+            return event.start_date === today;
+          }
+          const startDate = moment(event.start_date);
+          const endDate = event.recurrence_end_date ? moment(event.recurrence_end_date) : null;
+          const now = moment();
+          
+          if (now.isBefore(startDate, 'day') || (endDate && now.isAfter(endDate, 'day'))) {
+            return false;
+          }
+          
+          switch (event.recurrence_type) {
+            case 'daily':
+              return true;
+            case 'weekly':
+              return startDate.day() === now.day();
+            case 'monthly':
+              return startDate.date() === now.date();
+            default:
+              return false;
+          }
+        });
         setEvents(todayEvents);
       } catch (error) {
         console.error('Error loading events:', error);
@@ -63,7 +84,7 @@ export default function DashboardPage() {
 
     try {
       setLoading(true);
-      const attendanceRecords = await attendanceService.getRegisteredParticipantsWithAttendance(currentEvent.id);
+      const attendanceRecords = await apiGet<AttendanceRecord[]>(`/attendance?event_id=${currentEvent.uuid}`);
       setRecords(attendanceRecords);
       setFilteredRecords(attendanceRecords);
     } catch (error) {
@@ -102,7 +123,7 @@ export default function DashboardPage() {
         notes: ''
       }));
       
-      await attendanceService.submitAttendance(attendanceData);
+      await apiPost('/attendance', attendanceData);
       
       // Show success message
       showModal('Berhasil!', 'Kehadiran berhasil disimpan!', 'success', hideModal);
@@ -127,21 +148,22 @@ export default function DashboardPage() {
         try {
           let results: AttendanceRecord[];
           
-          // Get base results based on status filter
+          // Get base results - fetch from API and filter client-side
+          const allRecords = await apiGet<AttendanceRecord[]>(`/attendance?event_id=${currentEvent.uuid}`);
+          
+          // Apply status filter
           if (activeFilter === 'all') {
-            if (query.trim()) {
-              results = await attendanceService.searchParticipants(query, currentEvent.id);
-            } else {
-              results = await attendanceService.getAttendanceByEvent(currentEvent.id);
-            }
+            results = allRecords;
           } else {
-            results = await attendanceService.filterByStatus(activeFilter, currentEvent.id);
-            if (query.trim()) {
-              results = results.filter(record =>
-                record.participant.name.toLowerCase().includes(query.toLowerCase()) ||
-                record.participant.phone_number.includes(query)
-              );
-            }
+            results = allRecords.filter(record => record.attendance.status === activeFilter);
+          }
+          
+          // Apply search query
+          if (query.trim()) {
+            results = results.filter(record =>
+              record.participant.name.toLowerCase().includes(query.toLowerCase()) ||
+              record.participant.phone_number.includes(query)
+            );
           }
           
           // Apply gender filter
@@ -183,21 +205,22 @@ export default function DashboardPage() {
     try {
       let results: AttendanceRecord[];
       
-      // Get base results based on status filter
+      // Get base results - fetch from API and filter client-side
+      const allRecords = await apiGet<AttendanceRecord[]>(`/attendance?event_id=${currentEvent!.uuid}`);
+      
+      // Apply status filter
       if (status === 'all') {
-        if (query.trim()) {
-          results = await attendanceService.searchParticipants(query, currentEvent!.id);
-        } else {
-          results = await attendanceService.getAttendanceByEvent(currentEvent!.id);
-        }
+        results = allRecords;
       } else {
-        results = await attendanceService.filterByStatus(status, currentEvent!.id);
-        if (query.trim()) {
-          results = results.filter(record =>
-            record.participant.name.toLowerCase().includes(query.toLowerCase()) ||
-            record.participant.phone_number.includes(query)
-          );
-        }
+        results = allRecords.filter(record => record.attendance.status === status);
+      }
+      
+      // Apply search query
+      if (query.trim()) {
+        results = results.filter(record =>
+          record.participant.name.toLowerCase().includes(query.toLowerCase()) ||
+          record.participant.phone_number.includes(query)
+        );
       }
       
       // Apply gender filter

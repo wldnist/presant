@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import moment from 'moment';
 import 'moment/locale/id';
-import { EventInstance } from '@/types';
-import { MockEventInstanceService, MockAttendanceService, MockParticipantService } from '@/services/mockServices';
+import { EventInstance, Participant, AttendanceRecord } from '@/types';
 import { AttendanceSubmission } from '@/services/interfaces';
 import AppLayout from '@/components/AppLayout';
 import Pagination from '@/components/Pagination';
 import AttendanceStatusChart from '@/components/AttendanceStatusChart';
+import { apiGet } from '@/utils/api';
 
 interface ReportDetailData {
   event: EventInstance;
@@ -33,10 +33,6 @@ interface ParticipantWithAttendance {
   status: string;
 }
 
-// Services
-const eventInstanceService = new MockEventInstanceService();
-const attendanceService = new MockAttendanceService();
-const participantService = new MockParticipantService();
 
 export default function EventReportDetailPage() {
   const params = useParams();
@@ -64,48 +60,84 @@ export default function EventReportDetailPage() {
         }
         
         // Load event instance
-        const event = await eventInstanceService.getEventInstanceByUuid(eventUuid);
+        const event = await apiGet<EventInstance>(`/event-instances/${eventUuid}`);
         if (!event) {
           console.error('Event not found:', eventUuid);
           router.push('/reports/events');
           return;
         }
         
-        // Load attendance data
-        const allAttendance = await attendanceService.getAllAttendance();
-        const eventAttendance = allAttendance.filter(att => att.event_id === eventUuid);
+        // Load attendance data for this event
+        // API returns AttendanceRecord[] which has structure: { participant, attendance }
+        const attendanceRecords = await apiGet<AttendanceRecord[]>(`/attendance?event_id=${eventUuid}`);
         
         // Load participants
-        const allParticipants = await participantService.getAllParticipants();
+        const allParticipants = await apiGet<Participant[]>('/participants');
         const eventParticipants = allParticipants.filter(p => 
           event.registered_participants.includes(p.uuid)
         );
         
-        // Create attendance map
+        // Create attendance map using participant UUID as key
+        // AttendanceRecord structure: { participant: Participant, attendance: Attendance }
         const attendanceMap = new Map();
-        eventAttendance.forEach(att => {
-          attendanceMap.set(att.participant_id, att);
+        attendanceRecords.forEach(record => {
+          // Use participant.uuid as key, and store the attendance object
+          attendanceMap.set(record.participant.uuid, record.attendance);
         });
         
         // Combine participant data with attendance
-        const participantsWithAttendance = eventParticipants.map(participant => ({
-          ...participant,
-          attendance: attendanceMap.get(participant.uuid) || null,
-          status: attendanceMap.get(participant.uuid)?.status || 'absent'
-        }));
+        const participantsWithAttendance = eventParticipants.map(participant => {
+          const attendance = attendanceMap.get(participant.uuid);
+          return {
+            ...participant,
+            attendance: attendance || null,
+            status: attendance?.status || 'absent'
+          };
+        });
+        
+        // Convert AttendanceRecord[] to AttendanceSubmission[] for compatibility
+        // Note: timestamp might be a Date object or a string (after JSON serialization)
+        const eventAttendance: AttendanceSubmission[] = attendanceRecords.map(record => {
+          const timestamp = record.attendance.timestamp;
+          const timestampString = timestamp instanceof Date 
+            ? timestamp.toISOString() 
+            : (typeof timestamp === 'string' ? timestamp : new Date(timestamp).toISOString());
+          
+          return {
+            event_id: record.attendance.eventId,
+            participant_id: record.attendance.participantId,
+            status: record.attendance.status,
+            timestamp: timestampString,
+            notes: ''
+          };
+        });
         
         // Calculate only participants with status 'present' as attended
+        // IMPORTANT: Only count 'present' status, not 'excused', 'sick', or 'absent'
         const presentParticipants = participantsWithAttendance.filter(p => p.status === 'present').length;
+        const totalParticipants = event.registered_participants.length;
+        const attendanceRate = totalParticipants > 0 
+          ? (presentParticipants / totalParticipants * 100).toFixed(1)
+          : '0';
+        
+        // Debug logging (can be removed in production)
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Event Detail: ${event.title}`, {
+            totalParticipants,
+            presentParticipants,
+            attendanceRate,
+            allAttendanceCount: eventAttendance.length,
+            participantsStatuses: participantsWithAttendance.map(p => ({ name: p.name, status: p.status }))
+          });
+        }
         
         const reportData: ReportDetailData = {
           event,
           attendance: eventAttendance,
           participants: participantsWithAttendance,
-          totalParticipants: event.registered_participants.length,
+          totalParticipants,
           attendedParticipants: presentParticipants, // Only count 'present' status
-          attendanceRate: event.registered_participants.length > 0 
-            ? (presentParticipants / event.registered_participants.length * 100).toFixed(1)
-            : '0'
+          attendanceRate
         };
         
         setReportData(reportData);

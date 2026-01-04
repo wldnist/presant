@@ -3,13 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Participant } from '@/types';
-import { MockParticipantService } from '@/services/mockServices';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const participantService = new MockParticipantService();
+import { apiGet, apiPut, apiPost, apiDelete } from '@/utils/api';
 
 export default function ParticipantFormPage() {
   const [formData, setFormData] = useState({
@@ -30,7 +27,7 @@ export default function ParticipantFormPage() {
     const loadParticipant = async (uuid: string) => {
       try {
         setLoading(true);
-        const participant = await participantService.getParticipantByUuid(uuid);
+        const participant = await apiGet<Participant>(`/participants/${uuid}`);
         if (participant) {
           setFormData({
             name: participant.name,
@@ -68,13 +65,13 @@ export default function ParticipantFormPage() {
       
       if (isEdit && participantUuid) {
         // Update participant
-        await participantService.updateParticipant(participantUuid, formData);
+        await apiPut<Participant>(`/participants/${participantUuid}`, formData);
         showSuccess('Participant updated successfully', 'Success', () => {
           router.push('/participants');
         });
       } else {
         // Create new participant
-        await participantService.createParticipant(formData);
+        await apiPost<Participant>('/participants', formData);
         showSuccess('Participant created successfully', 'Success', () => {
           router.push('/participants');
         });
@@ -96,7 +93,7 @@ export default function ParticipantFormPage() {
       async () => {
         try {
           setLoading(true);
-          await participantService.deleteParticipant(participantUuid);
+          await apiDelete(`/participants/${participantUuid}`);
           showSuccess('Participant deleted successfully', 'Success', () => {
             router.push('/participants');
           });
@@ -155,13 +152,7 @@ export default function ParticipantFormPage() {
                 {isEdit ? 'Perbarui informasi participant' : 'Buat participant baru untuk mengikuti acara'}
               </p>
             </div>
-            <div className="mt-4 sm:mt-0 flex items-center space-x-3">
-              <button
-                onClick={() => router.push('/participants')}
-                className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-              >
-                Kembali
-              </button>
+            <div className="mt-4 sm:mt-0">
               {isEdit && (
                 <button
                   onClick={handleDelete}

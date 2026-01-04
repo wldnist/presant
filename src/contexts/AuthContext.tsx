@@ -39,17 +39,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string): Promise<void> => {
-    // Logic bypass - untuk sementara langsung set user tanpa validasi backend
-    // Default role adalah 'USER', bisa diubah sesuai kebutuhan
-    const mockUser: User = {
-      id: '1',
-      username: username,
-      name: username, // Gunakan username sebagai name
-      role: 'USER', // Default role, bisa diubah berdasarkan validasi dari backend
-    };
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    setUser(mockUser);
-    localStorage.setItem('presant_user', JSON.stringify(mockUser));
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login gagal');
+      }
+
+      const user: User = {
+        id: data.id,
+        username: data.username,
+        name: data.name || data.username,
+        role: data.role,
+      };
+
+      setUser(user);
+      localStorage.setItem('presant_user', JSON.stringify(user));
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error; // Re-throw agar bisa di-handle di component
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = (): void => {

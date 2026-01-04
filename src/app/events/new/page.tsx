@@ -2,15 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { MasterEvent } from '@/types';
-import { MockEventInstanceService, MockMasterEventService } from '@/services/mockServices';
+import { MasterEvent, EventInstance } from '@/types';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const eventInstanceService = new MockEventInstanceService();
-const masterEventService = new MockMasterEventService();
+import { apiGet, apiPost } from '@/utils/api';
 
 export default function NewEventInstancePage() {
   const [formData, setFormData] = useState({
@@ -38,7 +34,7 @@ export default function NewEventInstancePage() {
     const loadMasterEvents = async () => {
       try {
         setLoadingMasterEvents(true);
-        const allMasterEvents = await masterEventService.getAllMasterEvents();
+        const allMasterEvents = await apiGet<MasterEvent[]>('/master-events');
         setMasterEvents(allMasterEvents);
         
         // Don't auto-select master event - let user choose
@@ -112,7 +108,7 @@ export default function NewEventInstancePage() {
         status: 'published' as const
       };
 
-      await eventInstanceService.createEventInstance(eventInstanceData);
+      await apiPost<EventInstance>('/event-instances', eventInstanceData);
       showSuccess('Acara berhasil dibuat', 'Berhasil', () => {
         router.push('/events');
       });
@@ -161,17 +157,6 @@ export default function NewEventInstancePage() {
               <p className="text-gray-600">
                 Buat instansi acara baru berdasarkan master acara
               </p>
-            </div>
-            <div className="mt-4 sm:mt-0">
-              <button
-                onClick={() => router.push('/events')}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-              >
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Kembali
-              </button>
             </div>
           </div>
         </div>

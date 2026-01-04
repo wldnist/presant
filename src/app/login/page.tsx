@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import SimpleModal from '@/components/SimpleModal';
+import { useSimpleModal } from '@/hooks/useSimpleModal';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -10,6 +12,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const { modalState, hideModal, handleConfirm, showError } = useSimpleModal();
 
   // Redirect ke home jika sudah login
   useEffect(() => {
@@ -23,12 +26,11 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Logic bypass - untuk sementara langsung login tanpa validasi
       await login(username, password);
-      // Biarkan loading state tetap aktif sampai redirect selesai
-      router.push('/');
+      // Redirect akan terjadi otomatis via useEffect
     } catch (error) {
       console.error('Login error:', error);
+      showError(error instanceof Error ? error.message : 'Login gagal. Periksa username dan password Anda.');
       setIsLoading(false);
     }
   };
@@ -69,6 +71,16 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      {/* Simple Modal */}
+      <SimpleModal
+        isOpen={modalState.isOpen}
+        onClose={hideModal}
+        onConfirm={handleConfirm}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+      />
+      
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">

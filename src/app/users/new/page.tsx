@@ -2,14 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserRole } from '@/types';
-import { MockUserService } from '@/services/mockServices';
+import { UserRole, SystemUser } from '@/types';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const userService = new MockUserService();
+import { apiPost } from '@/utils/api';
 
 export default function NewUserPage() {
   const [formData, setFormData] = useState({
@@ -32,7 +29,7 @@ export default function NewUserPage() {
 
     try {
       setLoading(true);
-      await userService.createUser(formData);
+      await apiPost<SystemUser>('/users', formData);
       showSuccess('User berhasil dibuat', 'Berhasil', () => {
         router.push('/users');
       });
@@ -74,14 +71,6 @@ export default function NewUserPage() {
               <p className="text-gray-600">
                 Buat user baru untuk mengakses sistem
               </p>
-            </div>
-            <div className="mt-4 sm:mt-0">
-              <button
-                onClick={() => router.push('/users')}
-                className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-              >
-                Kembali
-              </button>
             </div>
           </div>
         </div>

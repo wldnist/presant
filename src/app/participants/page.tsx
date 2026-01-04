@@ -5,14 +5,11 @@ import { useRouter } from 'next/navigation';
 import moment from 'moment';
 import 'moment/locale/id';
 import { Participant } from '@/types';
-import { MockParticipantService } from '@/services/mockServices';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import Pagination from '@/components/Pagination';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const participantService = new MockParticipantService();
+import { apiGet, apiDelete } from '@/utils/api';
 
 export default function ParticipantsPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -29,7 +26,7 @@ export default function ParticipantsPage() {
     const loadParticipants = async () => {
       try {
         setLoading(true);
-        const allParticipants = await participantService.getAllParticipants();
+        const allParticipants = await apiGet<Participant[]>('/participants');
         setParticipants(allParticipants);
         setFilteredParticipants(allParticipants);
       } catch (error) {
@@ -80,10 +77,10 @@ export default function ParticipantsPage() {
       'Konfirmasi Hapus Participant',
       async () => {
         try {
-          await participantService.deleteParticipant(uuid);
+          await apiDelete(`/participants/${uuid}`);
           showSuccess('Participant berhasil dihapus');
           // Reload participants
-          const updatedParticipants = await participantService.getAllParticipants();
+          const updatedParticipants = await apiGet<Participant[]>('/participants');
           setParticipants(updatedParticipants);
           setFilteredParticipants(updatedParticipants);
         } catch (error) {

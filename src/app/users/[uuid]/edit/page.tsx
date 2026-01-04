@@ -2,14 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { UserRole } from '@/types';
-import { MockUserService } from '@/services/mockServices';
+import { UserRole, SystemUser } from '@/types';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const userService = new MockUserService();
+import { apiGet, apiPut, apiPost, apiDelete } from '@/utils/api';
 
 export default function UserFormPage() {
   const [formData, setFormData] = useState({
@@ -31,7 +28,7 @@ export default function UserFormPage() {
     const loadUser = async (uuid: string) => {
       try {
         setLoading(true);
-        const user = await userService.getUserByUuid(uuid);
+        const user = await apiGet<SystemUser>(`/users/${uuid}`);
         if (user) {
           setFormData({
             username: user.username,
@@ -85,13 +82,13 @@ export default function UserFormPage() {
           updateData.password = formData.password;
         }
         
-        await userService.updateUser(userUuid, updateData);
+        await apiPut<SystemUser>(`/users/${userUuid}`, updateData);
         showSuccess('User berhasil diperbarui', 'Berhasil', () => {
           router.push('/users');
         });
       } else {
         // Create new user
-        await userService.createUser(formData);
+        await apiPost<SystemUser>('/users', formData);
         showSuccess('User berhasil dibuat', 'Berhasil', () => {
           router.push('/users');
         });
@@ -113,7 +110,7 @@ export default function UserFormPage() {
       async () => {
         try {
           setLoading(true);
-          await userService.deleteUser(userUuid);
+          await apiDelete(`/users/${userUuid}`);
           showSuccess('User berhasil dihapus', 'Berhasil', () => {
             router.push('/users');
           });
@@ -172,13 +169,7 @@ export default function UserFormPage() {
                 {isEdit ? 'Perbarui informasi user' : 'Buat user baru untuk mengakses sistem'}
               </p>
             </div>
-            <div className="mt-4 sm:mt-0 flex items-center space-x-3">
-              <button
-                onClick={() => router.push('/users')}
-                className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-              >
-                Kembali
-              </button>
+            <div className="mt-4 sm:mt-0">
               {isEdit && (
                 <button
                   onClick={handleDelete}

@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import moment from 'moment';
 import 'moment/locale/id';
 import { EventInstance } from '@/types';
-import { MockEventInstanceService, MockAttendanceService } from '@/services/mockServices';
 import { AttendanceSubmission } from '@/services/interfaces';
 import AppLayout from '@/components/AppLayout';
 import Pagination from '@/components/Pagination';
+import { apiGet } from '@/utils/api';
 
 interface ReportData {
   event: EventInstance;
@@ -17,10 +17,6 @@ interface ReportData {
   attendedParticipants: number;
   attendanceRate: string;
 }
-
-// Services
-const eventInstanceService = new MockEventInstanceService();
-const attendanceService = new MockAttendanceService();
 
 export default function EventReportsPage() {
   const [eventInstances, setEventInstances] = useState<EventInstance[]>([]);
@@ -39,26 +35,41 @@ export default function EventReportsPage() {
         setLoading(true);
         
         // Load event instances
-        const allEventInstances = await eventInstanceService.getAllEventInstances();
+        const allEventInstances = await apiGet<EventInstance[]>('/event-instances');
         setEventInstances(allEventInstances);
         
         // Load attendance data
-        const allAttendance = await attendanceService.getAllAttendance();
+        const allAttendance = await apiGet<AttendanceSubmission[]>('/attendance');
         setAttendanceData(allAttendance);
         
         // Combine data
         const combinedData = allEventInstances.map(event => {
           const eventAttendance = allAttendance.filter(att => att.event_id === event.uuid);
           // Calculate only participants with status 'present' as attended
+          // IMPORTANT: Only count 'present' status, not 'excused', 'sick', or 'absent'
           const presentCount = eventAttendance.filter(att => att.status === 'present').length;
+          const totalParticipants = event.registered_participants.length;
+          const attendanceRate = totalParticipants > 0 
+            ? (presentCount / totalParticipants * 100).toFixed(1)
+            : '0';
+          
+          // Debug logging (can be removed in production)
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Event: ${event.title}`, {
+              totalParticipants,
+              presentCount,
+              attendanceRate,
+              allAttendanceCount: eventAttendance.length,
+              attendanceStatuses: eventAttendance.map(a => a.status)
+            });
+          }
+          
           return {
             event,
             attendance: eventAttendance,
-            totalParticipants: event.registered_participants.length,
+            totalParticipants,
             attendedParticipants: presentCount, // Only count 'present' status
-            attendanceRate: event.registered_participants.length > 0 
-              ? (presentCount / event.registered_participants.length * 100).toFixed(1)
-              : '0'
+            attendanceRate
           };
         });
         
@@ -82,15 +93,19 @@ export default function EventReportsPage() {
     const combinedData = eventInstances.map(event => {
       const eventAttendance = attendanceData.filter(att => att.event_id === event.uuid);
       // Calculate only participants with status 'present' as attended
+      // IMPORTANT: Only count 'present' status, not 'excused', 'sick', or 'absent'
       const presentCount = eventAttendance.filter(att => att.status === 'present').length;
+      const totalParticipants = event.registered_participants.length;
+      const attendanceRate = totalParticipants > 0 
+        ? (presentCount / totalParticipants * 100).toFixed(1)
+        : '0';
+      
       return {
         event,
         attendance: eventAttendance,
-        totalParticipants: event.registered_participants.length,
+        totalParticipants,
         attendedParticipants: presentCount, // Only count 'present' status
-        attendanceRate: event.registered_participants.length > 0 
-          ? (presentCount / event.registered_participants.length * 100).toFixed(1)
-          : '0'
+        attendanceRate
       };
     });
 

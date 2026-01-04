@@ -2,14 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { EventInstance, Participant, ParticipantFilters } from '@/types';
-import { MockEventInstanceService, MockParticipantService } from '@/services/mockServices';
 import ParticipantFilter from './ParticipantFilter';
 import SimpleModal from './SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const eventInstanceService = new MockEventInstanceService();
-const participantService = new MockParticipantService();
+import { apiGet, apiPut, apiPost, apiDelete } from '@/utils/api';
 
 interface ManageEventParticipantsModalProps {
   isOpen: boolean;
@@ -40,7 +36,7 @@ export default function ManageEventParticipantsModal({
           setLoading(true);
           
           // Load event instance
-          const event = await eventInstanceService.getEventInstanceByUuid(eventUuid);
+          const event = await apiGet<EventInstance>(`/event-instances/${eventUuid}`);
           if (!event) {
             showError('Acara tidak ditemukan');
             onClose();
@@ -49,7 +45,7 @@ export default function ManageEventParticipantsModal({
           setEventInstance(event);
           
           // Load all participants
-          const allParticipants = await participantService.getAllParticipants();
+          const allParticipants = await apiGet<Participant[]>('/participants');
           setParticipants(allParticipants);
           
           // Set currently registered participants as selected
@@ -92,18 +88,18 @@ export default function ManageEventParticipantsModal({
       
       // Add new participants
       for (const participantId of toAdd) {
-        await eventInstanceService.registerParticipant(eventUuid, participantId);
+        await apiPost(`/event-instances/${eventUuid}/participants`, { participantId });
       }
       
       // Remove unselected participants
       for (const participantId of toRemove) {
-        await eventInstanceService.unregisterParticipant(eventUuid, participantId);
+        await apiDelete(`/event-instances/${eventUuid}/participants?participant_id=${participantId}`);
       }
       
       showSuccess(`Peserta acara berhasil diperbarui. ${toAdd.length} ditambahkan, ${toRemove.length} dihapus.`);
       
       // Reload event instance to get updated data
-      const updatedEvent = await eventInstanceService.getEventInstanceByUuid(eventUuid);
+      const updatedEvent = await apiGet<EventInstance>(`/event-instances/${eventUuid}`);
       if (updatedEvent) {
         setEventInstance(updatedEvent);
       }

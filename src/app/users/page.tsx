@@ -5,14 +5,11 @@ import { useRouter } from 'next/navigation';
 import moment from 'moment';
 import 'moment/locale/id';
 import { SystemUser } from '@/types';
-import { MockUserService } from '@/services/mockServices';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import Pagination from '@/components/Pagination';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const userService = new MockUserService();
+import { apiGet, apiDelete } from '@/utils/api';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<SystemUser[]>([]);
@@ -29,7 +26,7 @@ export default function UsersPage() {
     const loadUsers = async () => {
       try {
         setLoading(true);
-        const allUsers = await userService.getAllUsers();
+        const allUsers = await apiGet<SystemUser[]>('/users');
         setUsers(allUsers);
         setFilteredUsers(allUsers);
       } catch (error) {
@@ -78,10 +75,10 @@ export default function UsersPage() {
       'Konfirmasi Hapus User',
       async () => {
         try {
-          await userService.deleteUser(uuid);
+          await apiDelete(`/users/${uuid}`);
           showSuccess('User berhasil dihapus');
           // Reload users
-          const updatedUsers = await userService.getAllUsers();
+          const updatedUsers = await apiGet<SystemUser[]>('/users');
           setUsers(updatedUsers);
           setFilteredUsers(updatedUsers);
         } catch (error) {

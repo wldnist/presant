@@ -3,13 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Participant } from '@/types';
-import { MockParticipantService } from '@/services/mockServices';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const participantService = new MockParticipantService();
+import { apiPost } from '@/utils/api';
 
 export default function NewParticipantPage() {
   const [formData, setFormData] = useState({
@@ -32,7 +29,7 @@ export default function NewParticipantPage() {
 
     try {
       setLoading(true);
-      await participantService.createParticipant(formData);
+      await apiPost<Participant>('/participants', formData);
       showSuccess('Participant created successfully', 'Success', () => {
         router.push('/participants');
       });
@@ -74,14 +71,6 @@ export default function NewParticipantPage() {
               <p className="text-gray-600">
                 Buat participant baru untuk mengikuti acara
               </p>
-            </div>
-            <div className="mt-4 sm:mt-0">
-              <button
-                onClick={() => router.push('/participants')}
-                className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-              >
-                Kembali
-              </button>
             </div>
           </div>
         </div>

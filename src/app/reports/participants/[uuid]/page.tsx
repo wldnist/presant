@@ -5,22 +5,17 @@ import { useRouter, useParams } from 'next/navigation';
 import moment from 'moment';
 import 'moment/locale/id';
 import { Participant, EventInstance } from '@/types';
-import { MockParticipantService, MockEventInstanceService, MockAttendanceService } from '@/services/mockServices';
 import { AttendanceSubmission } from '@/services/interfaces';
 import AppLayout from '@/components/AppLayout';
 import ParticipantEventAttendanceModal from '@/components/ParticipantEventAttendanceModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { apiGet } from '@/utils/api';
 
 interface EventAttendanceData {
   eventInstance: EventInstance;
   isPresent: boolean;
   attendance: AttendanceSubmission | null;
 }
-
-// Services
-const participantService = new MockParticipantService();
-const eventInstanceService = new MockEventInstanceService();
-const attendanceService = new MockAttendanceService();
 
 export default function ParticipantReportDetailPage() {
   const params = useParams();
@@ -48,7 +43,7 @@ export default function ParticipantReportDetailPage() {
         }
         
         // Load participant
-        const participantData = await participantService.getParticipantByUuid(participantUuid);
+        const participantData = await apiGet<Participant>(`/participants/${participantUuid}`);
         if (!participantData) {
           console.error('Participant not found:', participantUuid);
           router.push('/reports/participants');
@@ -57,15 +52,15 @@ export default function ParticipantReportDetailPage() {
         setParticipant(participantData);
         
         // Load all event instances
-        const allEventInstances = await eventInstanceService.getAllEventInstances();
+        const allEventInstances = await apiGet<EventInstance[]>('/event-instances');
         
         // Filter event instances where this participant is registered
         const participantEvents = allEventInstances.filter(event => 
           event.registered_participants.includes(participantUuid)
         );
         
-        // Load attendance data
-        const allAttendance = await attendanceService.getAllAttendance();
+        // Load attendance data for this participant
+        const allAttendance = await apiGet<AttendanceSubmission[]>('/attendance');
         const participantAttendance = allAttendance.filter(att => 
           att.participant_id === participantUuid
         );

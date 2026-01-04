@@ -5,15 +5,12 @@ import { useRouter } from 'next/navigation';
 import moment from 'moment';
 import 'moment/locale/id';
 import { EventInstance } from '@/types';
-import { MockEventInstanceService } from '@/services/mockServices';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import Pagination from '@/components/Pagination';
 import ManageEventParticipantsModal from '@/components/ManageEventParticipantsModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const eventInstanceService = new MockEventInstanceService();
+import { apiGet, apiDelete } from '@/utils/api';
 
 export default function EventInstancesPage() {
   const [eventInstances, setEventInstances] = useState<EventInstance[]>([]);
@@ -30,7 +27,7 @@ export default function EventInstancesPage() {
   useEffect(() => {
     const loadEventInstances = async () => {
       try {
-        const allEventInstances = await eventInstanceService.getAllEventInstances();
+        const allEventInstances = await apiGet<EventInstance[]>('/event-instances');
         setEventInstances(allEventInstances);
         setFilteredEventInstances(allEventInstances);
       } catch (error) {
@@ -86,7 +83,7 @@ export default function EventInstancesPage() {
   const handleParticipantsSaved = async () => {
     // Reload event instances setelah save berhasil
     try {
-      const updatedEventInstances = await eventInstanceService.getAllEventInstances();
+      const updatedEventInstances = await apiGet<EventInstance[]>('/event-instances');
       setEventInstances(updatedEventInstances);
       setFilteredEventInstances(updatedEventInstances);
     } catch (error) {
@@ -100,10 +97,10 @@ export default function EventInstancesPage() {
       'Konfirmasi Hapus Acara',
       async () => {
         try {
-          await eventInstanceService.deleteEventInstance(uuid);
+          await apiDelete(`/event-instances/${uuid}`);
           showSuccess('Acara berhasil dihapus');
           // Reload event instances
-          const updatedEventInstances = await eventInstanceService.getAllEventInstances();
+          const updatedEventInstances = await apiGet<EventInstance[]>('/event-instances');
           setEventInstances(updatedEventInstances);
           setFilteredEventInstances(updatedEventInstances);
         } catch (error) {

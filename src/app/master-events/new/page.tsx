@@ -2,13 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MockMasterEventService } from '@/services/mockServices';
+import { MasterEvent } from '@/types';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const masterEventService = new MockMasterEventService();
+import { apiPost } from '@/utils/api';
 
 export default function NewMasterEventPage() {
   const [formData, setFormData] = useState({
@@ -67,13 +65,10 @@ export default function NewMasterEventPage() {
         requirements: formData.requirements.length > 0 ? formData.requirements : undefined
       };
 
-      await masterEventService.createMasterEvent(masterEventData);
-      showSuccess('Master acara berhasil dibuat');
-      
-      // Redirect to master events list
-      setTimeout(() => {
+      await apiPost<MasterEvent>('/master-events', masterEventData);
+      showSuccess('Master acara berhasil dibuat', 'Berhasil', () => {
         router.push('/master-events');
-      }, 1500);
+      });
       
     } catch (error) {
       console.error('Error creating master event:', error);
@@ -106,17 +101,6 @@ export default function NewMasterEventPage() {
               <p className="text-gray-600">
                 Buat template acara yang dapat digunakan berulang
               </p>
-            </div>
-            <div className="mt-4 sm:mt-0">
-              <button
-                onClick={() => router.push('/master-events')}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-              >
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Kembali
-              </button>
             </div>
           </div>
         </div>

@@ -5,14 +5,11 @@ import { useRouter } from 'next/navigation';
 import moment from 'moment';
 import 'moment/locale/id';
 import { MasterEvent } from '@/types';
-import { MockMasterEventService } from '@/services/mockServices';
 import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import Pagination from '@/components/Pagination';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
-
-// Services
-const masterEventService = new MockMasterEventService();
+import { apiGet, apiDelete } from '@/utils/api';
 
 export default function MasterEventsPage() {
   const [masterEvents, setMasterEvents] = useState<MasterEvent[]>([]);
@@ -29,7 +26,7 @@ export default function MasterEventsPage() {
     const loadMasterEvents = async () => {
       try {
         setLoading(true);
-        const allMasterEvents = await masterEventService.getAllMasterEvents();
+        const allMasterEvents = await apiGet<MasterEvent[]>('/master-events');
         setMasterEvents(allMasterEvents);
         setFilteredMasterEvents(allMasterEvents);
       } catch (error) {
@@ -79,10 +76,10 @@ export default function MasterEventsPage() {
       'Konfirmasi Hapus Master Acara',
       async () => {
         try {
-          await masterEventService.deleteMasterEvent(uuid);
+          await apiDelete(`/master-events/${uuid}`);
           showSuccess('Master acara berhasil dihapus');
           // Reload master events
-          const updatedMasterEvents = await masterEventService.getAllMasterEvents();
+          const updatedMasterEvents = await apiGet<MasterEvent[]>('/master-events');
           setMasterEvents(updatedMasterEvents);
           setFilteredMasterEvents(updatedMasterEvents);
         } catch (error) {
