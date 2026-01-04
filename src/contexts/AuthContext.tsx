@@ -1,11 +1,13 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { UserRole } from '@/types';
 
 interface User {
   id: string;
   username: string;
   name: string;
+  role: UserRole;
 }
 
 interface AuthContextType {
@@ -38,10 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string): Promise<void> => {
     // Logic bypass - untuk sementara langsung set user tanpa validasi backend
+    // Default role adalah 'USER', bisa diubah sesuai kebutuhan
     const mockUser: User = {
       id: '1',
       username: username,
       name: username, // Gunakan username sebagai name
+      role: 'USER', // Default role, bisa diubah berdasarkan validasi dari backend
     };
 
     setUser(mockUser);
@@ -49,8 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = (): void => {
+    setIsLoading(true);
     setUser(null);
     localStorage.removeItem('presant_user');
+    // Set loading false setelah delay kecil untuk memastikan redirect terjadi
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
   };
 
   const value: AuthContextType = {

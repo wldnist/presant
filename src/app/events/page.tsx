@@ -6,9 +6,10 @@ import moment from 'moment';
 import 'moment/locale/id';
 import { EventInstance } from '@/types';
 import { MockEventInstanceService } from '@/services/mockServices';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import Pagination from '@/components/Pagination';
+import ManageEventParticipantsModal from '@/components/ManageEventParticipantsModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
 
 // Services
@@ -20,6 +21,8 @@ export default function EventInstancesPage() {
   const [filteredEventInstances, setFilteredEventInstances] = useState<EventInstance[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
+  const [selectedEventUuid, setSelectedEventUuid] = useState<string | null>(null);
   const router = useRouter();
   const { modalState, hideModal, handleConfirm, handleCancel, showSuccess, showError, showConfirm } = useSimpleModal();
 
@@ -71,7 +74,24 @@ export default function EventInstancesPage() {
   };
 
   const handleManageParticipants = (uuid: string) => {
-    router.push(`/events/${uuid}/participants`);
+    setSelectedEventUuid(uuid);
+    setParticipantsModalOpen(true);
+  };
+
+  const handleCloseParticipantsModal = () => {
+    setParticipantsModalOpen(false);
+    setSelectedEventUuid(null);
+  };
+
+  const handleParticipantsSaved = async () => {
+    // Reload event instances setelah save berhasil
+    try {
+      const updatedEventInstances = await eventInstanceService.getAllEventInstances();
+      setEventInstances(updatedEventInstances);
+      setFilteredEventInstances(updatedEventInstances);
+    } catch (error) {
+      console.error('Error reloading event instances:', error);
+    }
   };
 
   const handleDelete = async (uuid: string) => {
@@ -110,7 +130,7 @@ export default function EventInstancesPage() {
   };
 
   return (
-    <ProtectedRoute>
+    <AppLayout>
       <SimpleModal
         isOpen={modalState.isOpen}
         onClose={hideModal}
@@ -121,51 +141,41 @@ export default function EventInstancesPage() {
         onCancel={handleCancel}
       />
 
-      <div className="min-h-screen bg-gray-50">
+      {/* Manage Participants Modal */}
+      {selectedEventUuid && (
+        <ManageEventParticipantsModal
+          isOpen={participantsModalOpen}
+          onClose={handleCloseParticipantsModal}
+          eventUuid={selectedEventUuid}
+          onSave={handleParticipantsSaved}
+        />
+      )}
+
+      <div className="p-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  Manajemen Acara
-                </h1>
-                <p className="text-gray-600">
-                  Kelola instansi acara dengan peserta dan pengaturan berulang
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0 flex items-center space-x-3">
-                <button
-                  onClick={() => router.push('/')}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                >
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                  Back to Home
-                </button>
-                <button
-                  onClick={() => router.push('/master-events')}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                >
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  Master Acara
-                </button>
-                <button
-                  onClick={() => router.push('/events/new')}
-                  className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-                >
-                  Tambah Acara
-                </button>
-              </div>
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Manajemen Acara
+              </h1>
+              <p className="text-gray-600">
+                Kelola instansi acara dengan peserta dan pengaturan berulang
+              </p>
+            </div>
+            <div className="mt-4 sm:mt-0">
+              <button
+                onClick={() => router.push('/events/new')}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+              >
+                Tambah Acara
+              </button>
             </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm border">
             {/* Search Bar */}
             <div className="p-6 border-b border-gray-200">
@@ -323,6 +333,6 @@ export default function EventInstancesPage() {
           </div>
         </div>
       </div>
-    </ProtectedRoute>
+    </AppLayout>
   );
 }

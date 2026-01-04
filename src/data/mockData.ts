@@ -194,9 +194,41 @@ export const mockUsers: SystemUser[] = [
 // Mock Master Events Data
 export const mockMasterEvents: MasterEvent[] = [
   // Empty array - data will be populated when master events are created
+  {
+    id: '1',
+    uuid: '1',
+    title: 'kelas',
+    description: 'kelas',
+    location: 'Ruang Seminar A',
+    estimated_duration: 180, // dalam menit
+    max_participants: 1000,
+    requirements: ['Laptop'],
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z'
+  }
 ];
 
 // Mock Event Instances Data
 export const mockEventInstances: EventInstance[] = [
   // Empty array - data will be populated when event instances are created
+  {
+    id: '1',
+    uuid: '1',
+    master_event_id: '1',
+    master_event: mockMasterEvents[0],
+    title: 'kelas hari minggu',
+    description: 'kelas hari minggu',
+    location: 'Ruang Seminar A',
+    start_date: '2026-01-04',
+    end_date: '2026-01-04',
+    start_time: '00:00',
+    end_time: '23:59',
+    recurrence_type: 'none',
+    recurrence_end_date: '2024-01-01',
+    max_participants: 1000,
+    registered_participants: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+    status: 'published',
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z'
+  }
 ];

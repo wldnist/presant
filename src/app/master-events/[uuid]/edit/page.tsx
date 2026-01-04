@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { MasterEvent } from '@/types';
 import { MockMasterEventService } from '@/services/mockServices';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
 
@@ -26,7 +26,7 @@ export default function EditMasterEventPage() {
   const router = useRouter();
   const params = useParams();
   const masterEventUuid = params.uuid as string;
-  const { modalState, hideModal, handleConfirm, handleCancel, showSuccess, showError } = useSimpleModal();
+  const { modalState, hideModal, handleConfirm, handleCancel, showSuccess, showError, showConfirm } = useSimpleModal();
 
   // Load master event data
   useEffect(() => {
@@ -35,8 +35,9 @@ export default function EditMasterEventPage() {
         setLoadingData(true);
         const masterEvent = await masterEventService.getMasterEventByUuid(masterEventUuid);
         if (!masterEvent) {
-          showError('Master acara tidak ditemukan');
-          setTimeout(() => router.push('/master-events'), 1500);
+          showError('Master acara tidak ditemukan', 'Error', () => {
+            router.push('/master-events');
+          });
           return;
         }
 
@@ -51,8 +52,9 @@ export default function EditMasterEventPage() {
         
       } catch (error) {
         console.error('Error loading master event:', error);
-        showError('Gagal memuat data master acara');
-        setTimeout(() => router.push('/master-events'), 1500);
+        showError('Gagal memuat data master acara', 'Error', () => {
+          router.push('/master-events');
+        });
       } finally {
         setLoadingData(false);
       }
@@ -109,12 +111,9 @@ export default function EditMasterEventPage() {
       };
 
       await masterEventService.updateMasterEvent(masterEventUuid, masterEventData);
-      showSuccess('Master acara berhasil diperbarui');
-      
-      // Redirect to master events list
-      setTimeout(() => {
+      showSuccess('Master acara berhasil diperbarui', 'Berhasil', () => {
         router.push('/master-events');
-      }, 1500);
+      });
       
     } catch (error) {
       console.error('Error updating master event:', error);
@@ -125,15 +124,16 @@ export default function EditMasterEventPage() {
   };
 
   const handleDelete = () => {
-    showError(
-      'Apakah Anda yakin ingin menghapus master acara ini?',
-      'Konfirmasi Hapus',
+    showConfirm(
+      'Apakah Anda yakin ingin menghapus master acara ini? Tindakan ini tidak dapat dibatalkan.',
+      'Konfirmasi Hapus Master Acara',
       async () => {
         try {
           setLoading(true);
           await masterEventService.deleteMasterEvent(masterEventUuid);
-          showSuccess('Master acara berhasil dihapus');
-          setTimeout(() => router.push('/master-events'), 1500);
+          showSuccess('Master acara berhasil dihapus', 'Berhasil', () => {
+            router.push('/master-events');
+          });
         } catch (error) {
           console.error('Error deleting master event:', error);
           showError('Gagal menghapus master acara');
@@ -146,19 +146,19 @@ export default function EditMasterEventPage() {
 
   if (loadingData) {
     return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <AppLayout>
+        <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p className="text-gray-600">Memuat data master acara...</p>
           </div>
         </div>
-      </ProtectedRoute>
+      </AppLayout>
     );
   }
 
   return (
-    <ProtectedRoute>
+    <AppLayout>
       <SimpleModal
         isOpen={modalState.isOpen}
         onClose={hideModal}
@@ -169,42 +169,40 @@ export default function EditMasterEventPage() {
         onCancel={handleCancel}
       />
 
-      <div className="min-h-screen bg-gray-50">
+      <div className="p-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  Edit Master Acara
-                </h1>
-                <p className="text-gray-600">
-                  Perbarui template master acara
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0 flex items-center space-x-3">
-                <button
-                  onClick={() => router.push('/master-events')}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                >
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Kembali
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-                >
-                  Hapus Master Acara
-                </button>
-              </div>
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Edit Master Acara
+              </h1>
+              <p className="text-gray-600">
+                Perbarui template master acara
+              </p>
+            </div>
+            <div className="mt-4 sm:mt-0 flex items-center space-x-3">
+              <button
+                onClick={() => router.push('/master-events')}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Kembali
+              </button>
+              <button
+                onClick={handleDelete}
+                className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+              >
+                Hapus Master Acara
+              </button>
             </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm border">
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Title */}
@@ -348,6 +346,6 @@ export default function EditMasterEventPage() {
           </div>
         </div>
       </div>
-    </ProtectedRoute>
+    </AppLayout>
   );
 }

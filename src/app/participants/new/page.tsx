@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Participant } from '@/types';
 import { MockParticipantService } from '@/services/mockServices';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import AppLayout from '@/components/AppLayout';
 import SimpleModal from '@/components/SimpleModal';
 import { useSimpleModal } from '@/hooks/useSimpleModal';
 
@@ -53,8 +53,8 @@ export default function NewParticipantPage() {
   };
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+    <AppLayout>
+      <div className="p-4 sm:px-6 lg:px-8 py-6">
         {/* Simple Modal */}
         <SimpleModal
           isOpen={modalState.isOpen}
@@ -65,31 +65,29 @@ export default function NewParticipantPage() {
           type={modalState.type}
         />
         {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  Tambah Participant Baru
-                </h1>
-                <p className="text-gray-600">
-                  Buat participant baru untuk mengikuti acara
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0">
-                <button
-                  onClick={() => router.push('/participants')}
-                  className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-                >
-                  Kembali
-                </button>
-              </div>
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Tambah Participant Baru
+              </h1>
+              <p className="text-gray-600">
+                Buat participant baru untuk mengikuti acara
+              </p>
+            </div>
+            <div className="mt-4 sm:mt-0">
+              <button
+                onClick={() => router.push('/participants')}
+                className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+              >
+                Kembali
+              </button>
             </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Name */}
@@ -194,6 +192,6 @@ export default function NewParticipantPage() {
           </div>
         </div>
       </div>
-    </ProtectedRoute>
+    </AppLayout>
   );
 }

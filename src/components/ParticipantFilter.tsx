@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Participant, ParticipantFilters } from '@/types';
 import Pagination from './Pagination';
 
@@ -26,8 +26,13 @@ export default function ParticipantFilter({
   const [filteredParticipants, setFilteredParticipants] = useState<Participant[]>(participants);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const prevFiltersRef = useRef<ParticipantFilters>({
+    gender: 'all',
+    ageRange: { min: 0, max: 100 },
+    searchQuery: ''
+  });
 
-  // Apply filters
+  // Apply filters - separate effect for filtering
   useEffect(() => {
     let filtered = participants;
 
@@ -51,9 +56,26 @@ export default function ParticipantFilter({
     }
 
     setFilteredParticipants(filtered);
+  }, [participants, filters]);
+
+  // Reset pagination only when filters change
+  useEffect(() => {
+    const filtersChanged = 
+      prevFiltersRef.current.gender !== filters.gender ||
+      prevFiltersRef.current.ageRange.min !== filters.ageRange.min ||
+      prevFiltersRef.current.ageRange.max !== filters.ageRange.max ||
+      prevFiltersRef.current.searchQuery !== filters.searchQuery;
+    
+    if (filtersChanged) {
+      setCurrentPage(1);
+      prevFiltersRef.current = filters;
+    }
+  }, [filters]);
+
+  // Notify parent of filter changes
+  useEffect(() => {
     onFilterChange(filters);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [participants, filters, onFilterChange]);
+  }, [filters, onFilterChange]);
 
   const handleGenderChange = (gender: 'all' | 'L' | 'P') => {
     setFilters(prev => ({ ...prev, gender }));

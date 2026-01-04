@@ -43,25 +43,27 @@ export class MockAttendanceService implements AttendanceService {
     // Get existing attendance records for this event
     const existingAttendance = mockAttendance.filter(a => a.eventId === eventId);
     
-    // Create attendance map
+    // Create attendance map using UUID
     const attendanceMap = new Map();
     existingAttendance.forEach(att => {
-      attendanceMap.set(att.participantId, att);
+      const participant = mockParticipants.find(p => p.id === att.participantId);
+      if (participant) {
+        attendanceMap.set(participant.uuid, att);
+      }
     });
     
     // Return all registered participants with their attendance status
     return registeredParticipants.map(participant => {
-      const existingAtt = attendanceMap.get(participant.id);
+      const existingAtt = attendanceMap.get(participant.uuid);
       
       return {
         participant,
         attendance: existingAtt || {
-          id: `temp-${participant.id}-${eventId}`,
+          id: `temp-${participant.uuid}-${eventId}`,
           eventId,
           participantId: participant.id,
           status: 'absent' as AttendanceStatus,
-          timestamp: new Date(),
-          notes: ''
+          timestamp: new Date()
         }
       };
     });
@@ -369,17 +371,17 @@ export class MockEventInstanceService implements EventInstanceService {
     const startDate = moment(eventInstance.start_date);
     const endDate = eventInstance.recurrence_end_date ? moment(eventInstance.recurrence_end_date) : null;
 
-    // Check if today is within the event period
+    // If no recurrence, check if today matches the start date (ignore recurrence_end_date)
+    if (eventInstance.recurrence_type === 'none' || !eventInstance.recurrence_type) {
+      return eventInstance.start_date === todayString;
+    }
+
+    // For recurring events, check if today is within the event period
     if (today.isBefore(startDate, 'day')) {
       return false;
     }
     if (endDate && today.isAfter(endDate, 'day')) {
       return false;
-    }
-
-    // If no recurrence, check if today matches the start date
-    if (eventInstance.recurrence_type === 'none' || !eventInstance.recurrence_type) {
-      return eventInstance.start_date === todayString;
     }
 
     // Check recurrence patterns

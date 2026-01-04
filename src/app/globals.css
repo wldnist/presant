@@ -24,3 +24,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Cursor pointer untuk semua button dan link yang dapat diklik */
+button:not(:disabled),
+a,
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+/* Cursor not-allowed untuk button yang disabled */
+button:disabled {
+  cursor: not-allowed;
+}
