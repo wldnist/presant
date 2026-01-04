@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SystemUserRepository } from '@/repositories/sqlite/SystemUserRepository';
-import '@/infrastructure/database/migrate'; // Initialize database
+import { runMigrations } from '@/infrastructure/database/migrate';
+
+// Run migrations on first API call
+let migrationsInitialized = false;
 
 export async function POST(request: NextRequest) {
+  // Ensure migrations are run before handling request
+  if (!migrationsInitialized) {
+    try {
+      await runMigrations();
+      migrationsInitialized = true;
+    } catch (error) {
+      console.error('Migration error in login route:', error);
+      // Continue anyway - migrations might already be applied
+    }
+  }
+
   try {
     const { username, password } = await request.json();
 
@@ -17,11 +31,14 @@ export async function POST(request: NextRequest) {
     const user = await userRepository.findByUsername(username);
 
     if (!user) {
+      console.log(`User not found: ${username}`);
       return NextResponse.json(
         { error: 'Username atau password salah' },
         { status: 401 }
       );
     }
+    
+    console.log(`User found: ${user.username}, role: ${user.role}, active: ${user.is_active}`);
 
     if (!user.is_active) {
       return NextResponse.json(

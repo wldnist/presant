@@ -5,34 +5,37 @@ import { IEventInstanceRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
 import { ParticipantRepository } from './ParticipantRepository';
 import { EventInstanceWithMasterRow, ParticipantRow, SqliteError } from '@/infrastructure/database/types';
+import { dbAll, dbGet, dbRun } from '@/infrastructure/database/dbHelpers';
 
 export class EventInstanceRepository implements IEventInstanceRepository {
   private participantRepo = new ParticipantRepository();
 
   async findAll(): Promise<EventInstance[]> {
     const db = getDatabase();
-    const rows = db.prepare(`
+    const stmt = db.prepare(`
       SELECT ei.*, me.uuid as master_uuid, me.title as master_title, me.description as master_description,
              me.location as master_location, me.estimated_duration, me.max_participants as master_max_participants,
              me.requirements, me.created_at as master_created_at, me.updated_at as master_updated_at
       FROM event_instances ei
       LEFT JOIN master_events me ON ei.master_event_id = me.uuid
       ORDER BY ei.created_at DESC
-    `).all() as EventInstanceWithMasterRow[];
+    `);
+    const rows = await dbAll(stmt) as EventInstanceWithMasterRow[];
     
     return this.mapRowsToEventInstances(rows);
   }
 
   async findByUuid(uuid: string): Promise<EventInstance | null> {
     const db = getDatabase();
-    const row = db.prepare(`
+    const stmt = db.prepare(`
       SELECT ei.*, me.uuid as master_uuid, me.title as master_title, me.description as master_description,
              me.location as master_location, me.estimated_duration, me.max_participants as master_max_participants,
              me.requirements, me.created_at as master_created_at, me.updated_at as master_updated_at
       FROM event_instances ei
       LEFT JOIN master_events me ON ei.master_event_id = me.uuid
       WHERE ei.uuid = ?
-    `).get(uuid) as EventInstanceWithMasterRow | undefined;
+    `);
+    const row = await dbGet(stmt, uuid) as EventInstanceWithMasterRow | undefined;
     
     if (!row) return null;
     
@@ -41,7 +44,7 @@ export class EventInstanceRepository implements IEventInstanceRepository {
 
   async findByMasterEventId(masterEventId: string): Promise<EventInstance[]> {
     const db = getDatabase();
-    const rows = db.prepare(`
+    const stmt = db.prepare(`
       SELECT ei.*, me.uuid as master_uuid, me.title as master_title, me.description as master_description,
              me.location as master_location, me.estimated_duration, me.max_participants as master_max_participants,
              me.requirements, me.created_at as master_created_at, me.updated_at as master_updated_at
@@ -49,7 +52,8 @@ export class EventInstanceRepository implements IEventInstanceRepository {
       LEFT JOIN master_events me ON ei.master_event_id = me.uuid
       WHERE ei.master_event_id = ?
       ORDER BY ei.start_date ASC
-    `).all(masterEventId) as EventInstanceWithMasterRow[];
+    `);
+    const rows = await dbAll(stmt, masterEventId) as EventInstanceWithMasterRow[];
     
     return this.mapRowsToEventInstances(rows);
   }
@@ -59,13 +63,14 @@ export class EventInstanceRepository implements IEventInstanceRepository {
     const uuid = uuidv4();
     const now = new Date().toISOString();
     
-    db.prepare(`
+    const stmt = db.prepare(`
       INSERT INTO event_instances (
         uuid, master_event_id, title, description, location, start_date, end_date,
         start_time, end_time, recurrence_type, recurrence_end_date, max_participants, status, created_at, updated_at
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `);
+    await dbRun(stmt,
       uuid,
       eventInstance.master_event_id,
       eventInstance.title,
@@ -86,12 +91,9 @@ export class EventInstanceRepository implements IEventInstanceRepository {
     // Register participants
     if (eventInstance.registered_participants && eventInstance.registered_participants.length > 0) {
       const insertStmt = db.prepare('INSERT INTO event_instance_participants (event_instance_id, participant_id) VALUES (?, ?)');
-      const insertMany = db.transaction(() => {
-        for (const participantId of eventInstance.registered_participants) {
-          insertStmt.run(uuid, participantId);
-        }
-      });
-      insertMany();
+      for (const participantId of eventInstance.registered_participants) {
+        await dbRun(insertStmt, uuid, participantId);
+      }
     }
     
     // Fetch created instance with master event
@@ -117,12 +119,13 @@ export class EventInstanceRepository implements IEventInstanceRepository {
       updated_at: new Date().toISOString()
     };
     
-    db.prepare(`
+    const updateStmt = db.prepare(`
       UPDATE event_instances
       SET master_event_id = ?, title = ?, description = ?, location = ?, start_date = ?, end_date = ?,
           start_time = ?, end_time = ?, recurrence_type = ?, recurrence_end_date = ?, max_participants = ?, status = ?, updated_at = ?
       WHERE uuid = ?
-    `).run(
+    `);
+    await dbRun(updateStmt,
       updated.master_event_id,
       updated.title,
       updated.description || null,
@@ -142,18 +145,15 @@ export class EventInstanceRepository implements IEventInstanceRepository {
     // Update participants if provided
     if (eventInstance.registered_participants !== undefined) {
       // Delete existing
-      db.prepare('DELETE FROM event_instance_participants WHERE event_instance_id = ?').run(uuid);
+      const deleteStmt = db.prepare('DELETE FROM event_instance_participants WHERE event_instance_id = ?');
+      await dbRun(deleteStmt, uuid);
       
       // Insert new
       if (eventInstance.registered_participants && eventInstance.registered_participants.length > 0) {
         const insertStmt = db.prepare('INSERT INTO event_instance_participants (event_instance_id, participant_id) VALUES (?, ?)');
-        const participants = eventInstance.registered_participants;
-        const insertMany = db.transaction(() => {
-          for (const participantId of participants) {
-            insertStmt.run(uuid, participantId);
-          }
-        });
-        insertMany();
+        for (const participantId of eventInstance.registered_participants) {
+          await dbRun(insertStmt, uuid, participantId);
+        }
       }
     }
     
@@ -162,7 +162,8 @@ export class EventInstanceRepository implements IEventInstanceRepository {
 
   async delete(uuid: string): Promise<void> {
     const db = getDatabase();
-    const result = db.prepare('DELETE FROM event_instances WHERE uuid = ?').run(uuid);
+    const stmt = db.prepare('DELETE FROM event_instances WHERE uuid = ?');
+    const result = await dbRun(stmt, uuid);
     
     if (result.changes === 0) {
       throw new Error('Event instance not found');
@@ -172,10 +173,11 @@ export class EventInstanceRepository implements IEventInstanceRepository {
   async registerParticipant(eventInstanceId: string, participantId: string): Promise<void> {
     const db = getDatabase();
     try {
-      db.prepare(`
+      const stmt = db.prepare(`
         INSERT INTO event_instance_participants (event_instance_id, participant_id)
         VALUES (?, ?)
-      `).run(eventInstanceId, participantId);
+      `);
+      await dbRun(stmt, eventInstanceId, participantId);
     } catch (error) {
       const sqliteError = error as SqliteError;
       if (sqliteError.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -188,20 +190,22 @@ export class EventInstanceRepository implements IEventInstanceRepository {
 
   async unregisterParticipant(eventInstanceId: string, participantId: string): Promise<void> {
     const db = getDatabase();
-    db.prepare(`
+    const stmt = db.prepare(`
       DELETE FROM event_instance_participants
       WHERE event_instance_id = ? AND participant_id = ?
-    `).run(eventInstanceId, participantId);
+    `);
+    await dbRun(stmt, eventInstanceId, participantId);
   }
 
   async getRegisteredParticipants(eventInstanceId: string): Promise<Participant[]> {
     const db = getDatabase();
-    const rows = db.prepare(`
+    const stmt = db.prepare(`
       SELECT p.*
       FROM participants p
       INNER JOIN event_instance_participants eip ON p.uuid = eip.participant_id
       WHERE eip.event_instance_id = ?
-    `).all(eventInstanceId) as ParticipantRow[];
+    `);
+    const rows = await dbAll(stmt, eventInstanceId) as ParticipantRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),

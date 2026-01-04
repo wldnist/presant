@@ -4,11 +4,13 @@ import { Participant } from '@/types';
 import { IParticipantRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
 import { ParticipantRow } from '@/infrastructure/database/types';
+import { dbAll, dbGet, dbRun } from '@/infrastructure/database/dbHelpers';
 
 export class ParticipantRepository implements IParticipantRepository {
   async findAll(): Promise<Participant[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM participants ORDER BY created_at DESC').all() as ParticipantRow[];
+    const stmt = db.prepare('SELECT * FROM participants ORDER BY created_at DESC');
+    const rows = await dbAll(stmt) as ParticipantRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -24,7 +26,8 @@ export class ParticipantRepository implements IParticipantRepository {
 
   async findByUuid(uuid: string): Promise<Participant | null> {
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM participants WHERE uuid = ?').get(uuid) as ParticipantRow | undefined;
+    const stmt = db.prepare('SELECT * FROM participants WHERE uuid = ?');
+    const row = await dbGet(stmt, uuid) as ParticipantRow | undefined;
     
     if (!row) return null;
     
@@ -45,10 +48,11 @@ export class ParticipantRepository implements IParticipantRepository {
     const uuid = uuidv4();
     const now = new Date().toISOString();
     
-    const result = db.prepare(`
+    const stmt = db.prepare(`
       INSERT INTO participants (uuid, name, phone_number, gender, age, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `);
+    const result = await dbRun(stmt,
       uuid,
       participant.name,
       participant.phone_number,
@@ -81,11 +85,12 @@ export class ParticipantRepository implements IParticipantRepository {
       updated_at: new Date().toISOString()
     };
     
-    db.prepare(`
+    const stmt = db.prepare(`
       UPDATE participants
       SET name = ?, phone_number = ?, gender = ?, age = ?, updated_at = ?
       WHERE uuid = ?
-    `).run(
+    `);
+    await dbRun(stmt,
       updated.name,
       updated.phone_number,
       updated.gender,
@@ -99,7 +104,8 @@ export class ParticipantRepository implements IParticipantRepository {
 
   async delete(uuid: string): Promise<void> {
     const db = getDatabase();
-    const result = db.prepare('DELETE FROM participants WHERE uuid = ?').run(uuid);
+    const stmt = db.prepare('DELETE FROM participants WHERE uuid = ?');
+    const result = await dbRun(stmt, uuid);
     
     if (result.changes === 0) {
       throw new Error('Participant not found');

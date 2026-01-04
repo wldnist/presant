@@ -3,11 +3,13 @@ import { Attendance, AttendanceStatus } from '@/types';
 import { IAttendanceRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
 import { AttendanceRow } from '@/infrastructure/database/types';
+import { dbAll, dbGet, dbRun } from '@/infrastructure/database/dbHelpers';
 
 export class AttendanceRepository implements IAttendanceRepository {
   async findByEventId(eventId: string): Promise<Attendance[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM attendance WHERE event_id = ? ORDER BY timestamp DESC').all(eventId) as AttendanceRow[];
+    const stmt = db.prepare('SELECT * FROM attendance WHERE event_id = ? ORDER BY timestamp DESC');
+    const rows = await dbAll(stmt, eventId) as AttendanceRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -20,7 +22,8 @@ export class AttendanceRepository implements IAttendanceRepository {
 
   async findByParticipantId(participantId: string): Promise<Attendance[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM attendance WHERE participant_id = ? ORDER BY timestamp DESC').all(participantId) as AttendanceRow[];
+    const stmt = db.prepare('SELECT * FROM attendance WHERE participant_id = ? ORDER BY timestamp DESC');
+    const rows = await dbAll(stmt, participantId) as AttendanceRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -33,7 +36,8 @@ export class AttendanceRepository implements IAttendanceRepository {
 
   async findByParticipantAndEvent(participantId: string, eventId: string): Promise<Attendance | null> {
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM attendance WHERE participant_id = ? AND event_id = ?').get(participantId, eventId) as AttendanceRow | undefined;
+    const stmt = db.prepare('SELECT * FROM attendance WHERE participant_id = ? AND event_id = ?');
+    const row = await dbGet(stmt, participantId, eventId) as AttendanceRow | undefined;
     
     if (!row) return null;
     
@@ -48,10 +52,11 @@ export class AttendanceRepository implements IAttendanceRepository {
 
   async create(attendance: Omit<Attendance, 'id'>): Promise<Attendance> {
     const db = getDatabase();
-    const result = db.prepare(`
+    const stmt = db.prepare(`
       INSERT INTO attendance (participant_id, event_id, status, timestamp, notes)
       VALUES (?, ?, ?, ?, ?)
-    `).run(
+    `);
+    const result = await dbRun(stmt,
       attendance.participantId,
       attendance.eventId,
       attendance.status,
@@ -67,11 +72,12 @@ export class AttendanceRepository implements IAttendanceRepository {
 
   async update(attendance: Attendance): Promise<void> {
     const db = getDatabase();
-    db.prepare(`
+    const stmt = db.prepare(`
       UPDATE attendance
       SET status = ?, timestamp = ?, notes = ?
       WHERE id = ?
-    `).run(
+    `);
+    await dbRun(stmt,
       attendance.status,
       attendance.timestamp.toISOString(),
       null,
@@ -81,7 +87,8 @@ export class AttendanceRepository implements IAttendanceRepository {
 
   async delete(id: string): Promise<void> {
     const db = getDatabase();
-    db.prepare('DELETE FROM attendance WHERE id = ?').run(id);
+    const stmt = db.prepare('DELETE FROM attendance WHERE id = ?');
+    await dbRun(stmt, id);
   }
 
   async bulkCreate(attendances: Omit<Attendance, 'id'>[]): Promise<void> {
@@ -93,19 +100,15 @@ export class AttendanceRepository implements IAttendanceRepository {
       VALUES (?, ?, ?, ?, ?)
     `);
     
-    const insertMany = db.transaction((items: Omit<Attendance, 'id'>[]) => {
-      for (const attendance of items) {
-        insertStmt.run(
-          attendance.participantId,
-          attendance.eventId,
-          attendance.status,
-          attendance.timestamp.toISOString(),
-          null
-        );
-      }
-    });
-    
-    insertMany(attendances);
+    for (const attendance of attendances) {
+      await dbRun(insertStmt,
+        attendance.participantId,
+        attendance.eventId,
+        attendance.status,
+        attendance.timestamp.toISOString(),
+        null
+      );
+    }
   }
 }
 

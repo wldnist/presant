@@ -1,5 +1,5 @@
 // Database abstraction layer
-// Support untuk SQLite (local) dan siap untuk API/Turso di production
+// Support untuk SQLite (local dengan better-sqlite3) dan Turso (cloud SQLite)
 
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
@@ -10,18 +10,20 @@ type DatabaseType = {
 };
 
 type Statement = {
-  run: (...params: unknown[]) => { changes: number; lastInsertRowid: number | bigint };
-  get: (...params: unknown[]) => unknown;
-  all: (...params: unknown[]) => unknown[];
+  run: (...params: unknown[]) => { changes: number; lastInsertRowid: number | bigint } | Promise<{ changes: number; lastInsertRowid: number | bigint }>;
+  get: (...params: unknown[]) => unknown | Promise<unknown>;
+  all: (...params: unknown[]) => unknown[] | Promise<unknown[]>;
 };
 
 export type DatabaseInstance = {
-  pragma: (setting: string) => unknown;
+  pragma: (setting: string) => unknown | Promise<unknown>;
   close: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transaction: <T extends (...args: any[]) => any>(callback: T) => T;
   prepare: (sql: string) => Statement;
-  exec: (sql: string) => void;
+  exec: (sql: string) => void | Promise<void>;
+  // Flag untuk check apakah ini Turso (async) atau better-sqlite3 (sync)
+  _isTurso?: boolean;
 };
 
 // Conditional import untuk better-sqlite3 (optional dependency)
@@ -31,22 +33,56 @@ try {
   Database = require('better-sqlite3');
 } catch {
   // better-sqlite3 tidak tersedia (misalnya di Vercel build)
-  // Akan throw error saat getDatabase() dipanggil
+  // Akan menggunakan Turso jika tersedia
+}
+
+// Conditional import untuk Turso
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let createClient: ((config: { url: string; authToken: string }) => any) | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const libsql = require('@libsql/client');
+  createClient = libsql.createClient;
+} catch {
+  // @libsql/client tidak tersedia
 }
 
 let db: DatabaseInstance | null = null;
 
 export function getDatabase(): DatabaseInstance {
-  if (!Database) {
-    throw new Error(
-      'better-sqlite3 is not available. ' +
-      'This is expected in Vercel build environment. ' +
-      'Use API routes instead of direct database access.'
-    );
-  }
-
   if (db) {
     return db;
+  }
+
+  // Priority 1: Cek apakah ada Turso configuration (untuk Vercel/production)
+  if (process.env.TURSO_DATABASE_URL && createClient) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createTursoAdapter } = require('./tursoAdapter');
+    const tursoClient = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN || ''
+    });
+    
+    const tursoDb = createTursoAdapter(tursoClient);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (tursoDb as any)._isTurso = true;
+    db = tursoDb;
+    return tursoDb;
+  }
+
+  // Priority 2: Gunakan better-sqlite3 untuk development
+  if (!Database) {
+    if (process.env.VERCEL) {
+      throw new Error(
+        'SQLite file-based tidak didukung di Vercel. ' +
+        'Setup Turso: https://turso.tech dan tambahkan TURSO_DATABASE_URL dan TURSO_AUTH_TOKEN di environment variables. ' +
+        'Lihat dokumentasi di docs/VERCEL_DEPLOYMENT.md untuk setup lengkap.'
+      );
+    }
+    throw new Error(
+      'better-sqlite3 is not available. ' +
+      'Install dengan: npm install better-sqlite3'
+    );
   }
 
   // Untuk Vercel: gunakan /tmp (writable directory)

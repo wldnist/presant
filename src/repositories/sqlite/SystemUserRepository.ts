@@ -4,6 +4,7 @@ import { SystemUser, UserRole } from '@/types';
 import { ISystemUserRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
 import { hash } from 'bcryptjs';
+import { dbAll, dbGet, dbRun } from '@/infrastructure/database/dbHelpers';
 
 interface SystemUserRow {
   uuid: string;
@@ -18,7 +19,8 @@ interface SystemUserRow {
 export class SystemUserRepository implements ISystemUserRepository {
   async findAll(): Promise<SystemUser[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM system_users ORDER BY created_at DESC').all() as SystemUserRow[];
+    const stmt = db.prepare('SELECT * FROM system_users ORDER BY created_at DESC');
+    const rows = await dbAll(stmt) as SystemUserRow[];
     
     return rows.map(row => ({
       uuid: row.uuid,
@@ -33,7 +35,8 @@ export class SystemUserRepository implements ISystemUserRepository {
 
   async findByUuid(uuid: string): Promise<SystemUser | null> {
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM system_users WHERE uuid = ?').get(uuid) as SystemUserRow | undefined;
+    const stmt = db.prepare('SELECT * FROM system_users WHERE uuid = ?');
+    const row = await dbGet(stmt, uuid) as SystemUserRow | undefined;
     
     if (!row) return null;
     
@@ -50,7 +53,8 @@ export class SystemUserRepository implements ISystemUserRepository {
 
   async findByUsername(username: string): Promise<SystemUser | null> {
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM system_users WHERE username = ?').get(username) as SystemUserRow | undefined;
+    const stmt = db.prepare('SELECT * FROM system_users WHERE username = ?');
+    const row = await dbGet(stmt, username) as SystemUserRow | undefined;
     
     if (!row) return null;
     
@@ -76,10 +80,11 @@ export class SystemUserRepository implements ISystemUserRepository {
       hashedPassword = await hash(user.password, 10);
     }
     
-    db.prepare(`
+    const stmt = db.prepare(`
       INSERT INTO system_users (uuid, username, password, role, is_active, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `);
+    await dbRun(stmt,
       uuid,
       user.username,
       hashedPassword,
@@ -124,11 +129,12 @@ export class SystemUserRepository implements ISystemUserRepository {
       updated_at: new Date().toISOString()
     };
     
-    db.prepare(`
+    const stmt = db.prepare(`
       UPDATE system_users
       SET username = ?, password = ?, role = ?, is_active = ?, updated_at = ?
       WHERE uuid = ?
-    `).run(
+    `);
+    await dbRun(stmt,
       updated.username,
       updated.password,
       updated.role,
@@ -142,7 +148,8 @@ export class SystemUserRepository implements ISystemUserRepository {
 
   async delete(uuid: string): Promise<void> {
     const db = getDatabase();
-    const result = db.prepare('DELETE FROM system_users WHERE uuid = ?').run(uuid);
+    const stmt = db.prepare('DELETE FROM system_users WHERE uuid = ?');
+    const result = await dbRun(stmt, uuid);
     
     if (result.changes === 0) {
       throw new Error('User not found');
@@ -152,11 +159,12 @@ export class SystemUserRepository implements ISystemUserRepository {
   async search(query: string): Promise<SystemUser[]> {
     const db = getDatabase();
     const searchTerm = `%${query.toLowerCase()}%`;
-    const rows = db.prepare(`
+    const stmt = db.prepare(`
       SELECT * FROM system_users
       WHERE LOWER(username) LIKE ? OR LOWER(role) LIKE ?
       ORDER BY created_at DESC
-    `).all(searchTerm, searchTerm) as SystemUserRow[];
+    `);
+    const rows = await dbAll(stmt, searchTerm, searchTerm) as SystemUserRow[];
     
     return rows.map(row => ({
       uuid: row.uuid,

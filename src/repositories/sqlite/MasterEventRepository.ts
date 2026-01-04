@@ -4,11 +4,13 @@ import { MasterEvent } from '@/types';
 import { IMasterEventRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
 import { MasterEventRow } from '@/infrastructure/database/types';
+import { dbAll, dbGet, dbRun } from '@/infrastructure/database/dbHelpers';
 
 export class MasterEventRepository implements IMasterEventRepository {
   async findAll(): Promise<MasterEvent[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM master_events ORDER BY created_at DESC').all() as MasterEventRow[];
+    const stmt = db.prepare('SELECT * FROM master_events ORDER BY created_at DESC');
+    const rows = await dbAll(stmt) as MasterEventRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -26,7 +28,8 @@ export class MasterEventRepository implements IMasterEventRepository {
 
   async findByUuid(uuid: string): Promise<MasterEvent | null> {
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM master_events WHERE uuid = ?').get(uuid) as MasterEventRow | undefined;
+    const stmt = db.prepare('SELECT * FROM master_events WHERE uuid = ?');
+    const row = await dbGet(stmt, uuid) as MasterEventRow | undefined;
     
     if (!row) return null;
     
@@ -49,10 +52,11 @@ export class MasterEventRepository implements IMasterEventRepository {
     const uuid = uuidv4();
     const now = new Date().toISOString();
     
-    const result = db.prepare(`
+    const stmt = db.prepare(`
       INSERT INTO master_events (uuid, title, description, location, estimated_duration, max_participants, requirements, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `);
+    const result = await dbRun(stmt,
       uuid,
       masterEvent.title,
       masterEvent.description || null,
@@ -87,11 +91,12 @@ export class MasterEventRepository implements IMasterEventRepository {
       updated_at: new Date().toISOString()
     };
     
-    db.prepare(`
+    const stmt = db.prepare(`
       UPDATE master_events
       SET title = ?, description = ?, location = ?, estimated_duration = ?, max_participants = ?, requirements = ?, updated_at = ?
       WHERE uuid = ?
-    `).run(
+    `);
+    await dbRun(stmt,
       updated.title,
       updated.description || null,
       updated.location || null,
@@ -107,7 +112,8 @@ export class MasterEventRepository implements IMasterEventRepository {
 
   async delete(uuid: string): Promise<void> {
     const db = getDatabase();
-    const result = db.prepare('DELETE FROM master_events WHERE uuid = ?').run(uuid);
+    const stmt = db.prepare('DELETE FROM master_events WHERE uuid = ?');
+    const result = await dbRun(stmt, uuid);
     
     if (result.changes === 0) {
       throw new Error('Master event not found');
@@ -117,13 +123,14 @@ export class MasterEventRepository implements IMasterEventRepository {
   async search(query: string): Promise<MasterEvent[]> {
     const db = getDatabase();
     const searchTerm = `%${query.toLowerCase()}%`;
-    const rows = db.prepare(`
+    const stmt = db.prepare(`
       SELECT * FROM master_events
       WHERE LOWER(title) LIKE ? 
          OR LOWER(description) LIKE ?
          OR LOWER(location) LIKE ?
       ORDER BY created_at DESC
-    `).all(searchTerm, searchTerm, searchTerm) as MasterEventRow[];
+    `);
+    const rows = await dbAll(stmt, searchTerm, searchTerm, searchTerm) as MasterEventRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
