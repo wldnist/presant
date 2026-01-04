@@ -49,14 +49,30 @@ export function getDatabase(): DatabaseInstance {
     return db;
   }
 
-  // Untuk development: gunakan SQLite file-based
+  // Untuk Vercel: gunakan /tmp (writable directory)
+  // Untuk development: gunakan data/ directory
   // Untuk production: bisa switch ke API/Turso
-  const dbPath = process.env.DATABASE_PATH || join(process.cwd(), 'data', 'presant.db');
-  const dbDir = join(process.cwd(), 'data');
+  let dbPath: string;
+  let dbDir: string;
   
-  // Ensure data directory exists
-  if (!existsSync(dbDir)) {
-    mkdirSync(dbDir, { recursive: true });
+  if (process.env.VERCEL) {
+    // Di Vercel, gunakan /tmp yang writable
+    dbPath = '/tmp/presant.db';
+    dbDir = '/tmp';
+  } else {
+    // Development: gunakan data/ directory
+    dbPath = process.env.DATABASE_PATH || join(process.cwd(), 'data', 'presant.db');
+    dbDir = join(process.cwd(), 'data');
+    
+    // Ensure data directory exists (hanya di development)
+    if (!existsSync(dbDir)) {
+      try {
+        mkdirSync(dbDir, { recursive: true });
+      } catch (error) {
+        console.error('Error creating data directory:', error);
+        throw new Error(`Cannot create database directory: ${dbDir}. Make sure you have write permissions.`);
+      }
+    }
   }
 
   try {
@@ -65,8 +81,13 @@ export function getDatabase(): DatabaseInstance {
     // Enable foreign keys
     db.pragma('foreign_keys = ON');
     
-    // WAL mode for better concurrency
-    db.pragma('journal_mode = WAL');
+    // WAL mode for better concurrency (tidak didukung di /tmp, tapi tidak masalah)
+    try {
+      db.pragma('journal_mode = WAL');
+    } catch {
+      // Ignore jika WAL tidak didukung (misalnya di /tmp)
+      db.pragma('journal_mode = DELETE');
+    }
     
     return db;
   } catch (error) {

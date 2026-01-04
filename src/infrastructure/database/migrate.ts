@@ -5,9 +5,9 @@ import { getDatabase } from './db';
 
 export function runMigrations(): void {
   try {
-    // Skip migrations if better-sqlite3 is not available (e.g., during Vercel build)
-    // Migrations will run at runtime when API routes are called
-    if (process.env.VERCEL || process.env.NEXT_PHASE === 'phase-production-build') {
+    // Skip migrations during build phase only
+    // At runtime (even in Vercel), migrations should run
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
       console.log('Skipping migrations during build phase');
       return;
     }
@@ -16,12 +16,16 @@ export function runMigrations(): void {
     try {
       db = getDatabase();
     } catch (dbError) {
-      // better-sqlite3 not available during build, skip migrations
-      if (process.env.NODE_ENV !== 'production' || process.env.VERCEL) {
+      // better-sqlite3 not available, skip migrations
+      // This can happen during build, but should not happen at runtime
+      if (process.env.NEXT_PHASE === 'phase-production-build') {
         console.log('Database not available during build, migrations will run at runtime');
         return;
       }
-      throw dbError;
+      // At runtime, if database is not available, log error but don't throw
+      // (might be intentional if using external database)
+      console.error('Database not available at runtime:', dbError);
+      return;
     }
     const migrationsDir = join(process.cwd(), 'src', 'infrastructure', 'database', 'migrations');
     
