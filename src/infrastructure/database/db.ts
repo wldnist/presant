@@ -1,13 +1,49 @@
 // Database abstraction layer
 // Support untuk SQLite (local) dan siap untuk API/Turso di production
 
-import Database from 'better-sqlite3';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
-let db: Database.Database | null = null;
+// Type untuk better-sqlite3 Database
+type DatabaseType = {
+  new (path: string): DatabaseInstance;
+};
 
-export function getDatabase(): Database.Database {
+type Statement = {
+  run: (...params: unknown[]) => { changes: number; lastInsertRowid: number | bigint };
+  get: (...params: unknown[]) => unknown;
+  all: (...params: unknown[]) => unknown[];
+};
+
+type DatabaseInstance = {
+  pragma: (setting: string) => unknown;
+  close: () => void;
+  transaction: <T>(callback: (db: DatabaseInstance) => T) => (db: DatabaseInstance) => T;
+  prepare: (sql: string) => Statement;
+  exec: (sql: string) => void;
+};
+
+// Conditional import untuk better-sqlite3 (optional dependency)
+let Database: DatabaseType | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  Database = require('better-sqlite3');
+} catch {
+  // better-sqlite3 tidak tersedia (misalnya di Vercel build)
+  // Akan throw error saat getDatabase() dipanggil
+}
+
+let db: DatabaseInstance | null = null;
+
+export function getDatabase(): DatabaseInstance {
+  if (!Database) {
+    throw new Error(
+      'better-sqlite3 is not available. ' +
+      'This is expected in Vercel build environment. ' +
+      'Use API routes instead of direct database access.'
+    );
+  }
+
   if (db) {
     return db;
   }
@@ -46,9 +82,9 @@ export function closeDatabase(): void {
 }
 
 // Helper untuk transaction
-export function transaction<T>(callback: (db: Database.Database) => T): T {
+export function transaction<T>(callback: (db: DatabaseInstance) => T): T {
   const database = getDatabase();
-  const transaction = database.transaction(callback);
-  return transaction(database);
+  const transactionFn = database.transaction(callback);
+  return transactionFn(database);
 }
 
