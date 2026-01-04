@@ -14,6 +14,7 @@ import {
   AttendanceRecord,
   Participant,
   Event,
+  Attendance,
   AttendanceStatus,
   SystemUser,
   MasterEvent,

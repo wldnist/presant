@@ -18,7 +18,8 @@ type Statement = {
 export type DatabaseInstance = {
   pragma: (setting: string) => unknown;
   close: () => void;
-  transaction: <T>(callback: () => T) => () => T;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transaction: <T extends (...args: any[]) => any>(callback: T) => T;
   prepare: (sql: string) => Statement;
   exec: (sql: string) => void;
 };

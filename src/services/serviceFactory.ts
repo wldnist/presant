@@ -81,7 +81,7 @@ export function createAttendanceService(): AttendanceService {
   switch (provider) {
     case 'sqlite': {
       const repos = getRepositories();
-      if (!repos) {
+      if (!repos || !repos.attendanceRepo || !repos.participantRepo || !repos.eventInstanceRepo) {
         throw new Error('Repositories not available on client-side');
       }
       return new SqliteAttendanceService(
@@ -104,7 +104,7 @@ export function createParticipantService(): ParticipantService {
   switch (provider) {
     case 'sqlite': {
       const repos = getRepositories();
-      if (!repos) {
+      if (!repos || !repos.participantRepo) {
         throw new Error('Repositories not available on client-side');
       }
       return new SqliteParticipantService(repos.participantRepo);
@@ -123,7 +123,7 @@ export function createEventService(): EventService {
   switch (provider) {
     case 'sqlite': {
       const repos = getRepositories();
-      if (!repos) {
+      if (!repos || !repos.eventInstanceRepo) {
         throw new Error('Repositories not available on client-side');
       }
       return new SqliteEventService(repos.eventInstanceRepo);
@@ -142,7 +142,7 @@ export function createUserService(): UserService {
   switch (provider) {
     case 'sqlite': {
       const repos = getRepositories();
-      if (!repos) {
+      if (!repos || !repos.systemUserRepo) {
         throw new Error('Repositories not available on client-side');
       }
       return new SqliteUserService(repos.systemUserRepo);
@@ -161,7 +161,7 @@ export function createMasterEventService(): MasterEventService {
   switch (provider) {
     case 'sqlite': {
       const repos = getRepositories();
-      if (!repos) {
+      if (!repos || !repos.masterEventRepo) {
         throw new Error('Repositories not available on client-side');
       }
       return new SqliteMasterEventService(repos.masterEventRepo);
@@ -180,7 +180,7 @@ export function createEventInstanceService(): EventInstanceService {
   switch (provider) {
     case 'sqlite': {
       const repos = getRepositories();
-      if (!repos) {
+      if (!repos || !repos.eventInstanceRepo) {
         throw new Error('Repositories not available on client-side');
       }
       return new SqliteEventInstanceService(repos.eventInstanceRepo);
