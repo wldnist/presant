@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
         config.externals.push('better-sqlite3');
       } else if (typeof config.externals === 'function') {
         const originalExternals = config.externals;
-        config.externals = (context: any, request: string, callback: any) => {
+        config.externals = (context: unknown, request: string, callback: (err: Error | null, result?: string) => void) => {
           if (request === 'better-sqlite3') {
             return callback(null, 'commonjs ' + request);
           }

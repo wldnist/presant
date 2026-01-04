@@ -67,7 +67,7 @@ export class SqliteAttendanceService implements AttendanceService {
     const registeredParticipants = await this.eventInstanceRepo.getRegisteredParticipants(eventId);
     const existingAttendance = await this.attendanceRepo.findByEventId(eventId);
 
-    const attendanceMap = new Map<string, any>();
+    const attendanceMap = new Map<string, Attendance>();
     existingAttendance.forEach(att => {
       attendanceMap.set(att.participantId, att);
     });
