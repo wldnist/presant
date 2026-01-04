@@ -4,6 +4,7 @@ import { EventInstance, Participant } from '@/types';
 import { IEventInstanceRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
 import { ParticipantRepository } from './ParticipantRepository';
+import { EventInstanceWithMasterRow, ParticipantRow, SqliteError } from '@/infrastructure/database/types';
 
 export class EventInstanceRepository implements IEventInstanceRepository {
   private participantRepo = new ParticipantRepository();
@@ -17,7 +18,7 @@ export class EventInstanceRepository implements IEventInstanceRepository {
       FROM event_instances ei
       LEFT JOIN master_events me ON ei.master_event_id = me.uuid
       ORDER BY ei.created_at DESC
-    `).all() as any[];
+    `).all() as EventInstanceWithMasterRow[];
     
     return this.mapRowsToEventInstances(rows);
   }
@@ -31,7 +32,7 @@ export class EventInstanceRepository implements IEventInstanceRepository {
       FROM event_instances ei
       LEFT JOIN master_events me ON ei.master_event_id = me.uuid
       WHERE ei.uuid = ?
-    `).get(uuid) as any;
+    `).get(uuid) as EventInstanceWithMasterRow | undefined;
     
     if (!row) return null;
     
@@ -48,7 +49,7 @@ export class EventInstanceRepository implements IEventInstanceRepository {
       LEFT JOIN master_events me ON ei.master_event_id = me.uuid
       WHERE ei.master_event_id = ?
       ORDER BY ei.start_date ASC
-    `).all(masterEventId) as any[];
+    `).all(masterEventId) as EventInstanceWithMasterRow[];
     
     return this.mapRowsToEventInstances(rows);
   }
@@ -58,7 +59,7 @@ export class EventInstanceRepository implements IEventInstanceRepository {
     const uuid = uuidv4();
     const now = new Date().toISOString();
     
-    const result = db.prepare(`
+    db.prepare(`
       INSERT INTO event_instances (
         uuid, master_event_id, title, description, location, start_date, end_date,
         start_time, end_time, recurrence_type, recurrence_end_date, max_participants, status, created_at, updated_at
@@ -85,12 +86,12 @@ export class EventInstanceRepository implements IEventInstanceRepository {
     // Register participants
     if (eventInstance.registered_participants && eventInstance.registered_participants.length > 0) {
       const insertStmt = db.prepare('INSERT INTO event_instance_participants (event_instance_id, participant_id) VALUES (?, ?)');
-      const insertMany = db.transaction((participants: string[]) => {
-        for (const participantId of participants) {
+      const insertMany = db.transaction(() => {
+        for (const participantId of eventInstance.registered_participants) {
           insertStmt.run(uuid, participantId);
         }
       });
-      insertMany(eventInstance.registered_participants);
+      insertMany();
     }
     
     // Fetch created instance with master event
@@ -144,14 +145,15 @@ export class EventInstanceRepository implements IEventInstanceRepository {
       db.prepare('DELETE FROM event_instance_participants WHERE event_instance_id = ?').run(uuid);
       
       // Insert new
-      if (eventInstance.registered_participants.length > 0) {
+      if (eventInstance.registered_participants && eventInstance.registered_participants.length > 0) {
         const insertStmt = db.prepare('INSERT INTO event_instance_participants (event_instance_id, participant_id) VALUES (?, ?)');
-        const insertMany = db.transaction((participants: string[]) => {
+        const participants = eventInstance.registered_participants;
+        const insertMany = db.transaction(() => {
           for (const participantId of participants) {
             insertStmt.run(uuid, participantId);
           }
         });
-        insertMany(eventInstance.registered_participants);
+        insertMany();
       }
     }
     
@@ -174,8 +176,9 @@ export class EventInstanceRepository implements IEventInstanceRepository {
         INSERT INTO event_instance_participants (event_instance_id, participant_id)
         VALUES (?, ?)
       `).run(eventInstanceId, participantId);
-    } catch (error: any) {
-      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    } catch (error) {
+      const sqliteError = error as SqliteError;
+      if (sqliteError.code === 'SQLITE_CONSTRAINT_UNIQUE') {
         // Already registered, ignore
         return;
       }
@@ -198,7 +201,7 @@ export class EventInstanceRepository implements IEventInstanceRepository {
       FROM participants p
       INNER JOIN event_instance_participants eip ON p.uuid = eip.participant_id
       WHERE eip.event_instance_id = ?
-    `).all(eventInstanceId) as any[];
+    `).all(eventInstanceId) as ParticipantRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -212,7 +215,7 @@ export class EventInstanceRepository implements IEventInstanceRepository {
     }));
   }
 
-  private mapRowToEventInstance(row: any): EventInstance {
+  private mapRowToEventInstance(row: EventInstanceWithMasterRow): EventInstance {
     return {
       id: row.id.toString(),
       uuid: row.uuid,
@@ -226,8 +229,8 @@ export class EventInstanceRepository implements IEventInstanceRepository {
         estimated_duration: row.estimated_duration || undefined,
         max_participants: row.master_max_participants || undefined,
         requirements: row.requirements ? JSON.parse(row.requirements) : undefined,
-        created_at: row.master_created_at,
-        updated_at: row.master_updated_at
+        created_at: row.master_created_at || undefined,
+        updated_at: row.master_updated_at || undefined
       },
       title: row.title,
       description: row.description || undefined,
@@ -246,7 +249,7 @@ export class EventInstanceRepository implements IEventInstanceRepository {
     };
   }
 
-  private mapRowsToEventInstances(rows: any[]): EventInstance[] {
+  private mapRowsToEventInstances(rows: EventInstanceWithMasterRow[]): EventInstance[] {
     return rows.map(row => this.mapRowToEventInstance(row));
   }
 }

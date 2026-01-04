@@ -2,11 +2,12 @@
 import { Attendance, AttendanceStatus } from '@/types';
 import { IAttendanceRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
+import { AttendanceRow } from '@/infrastructure/database/types';
 
 export class AttendanceRepository implements IAttendanceRepository {
   async findByEventId(eventId: string): Promise<Attendance[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM attendance WHERE event_id = ? ORDER BY timestamp DESC').all(eventId) as any[];
+    const rows = db.prepare('SELECT * FROM attendance WHERE event_id = ? ORDER BY timestamp DESC').all(eventId) as AttendanceRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -19,7 +20,7 @@ export class AttendanceRepository implements IAttendanceRepository {
 
   async findByParticipantId(participantId: string): Promise<Attendance[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM attendance WHERE participant_id = ? ORDER BY timestamp DESC').all(participantId) as any[];
+    const rows = db.prepare('SELECT * FROM attendance WHERE participant_id = ? ORDER BY timestamp DESC').all(participantId) as AttendanceRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -32,7 +33,7 @@ export class AttendanceRepository implements IAttendanceRepository {
 
   async findByParticipantAndEvent(participantId: string, eventId: string): Promise<Attendance | null> {
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM attendance WHERE participant_id = ? AND event_id = ?').get(participantId, eventId) as any;
+    const row = db.prepare('SELECT * FROM attendance WHERE participant_id = ? AND event_id = ?').get(participantId, eventId) as AttendanceRow | undefined;
     
     if (!row) return null;
     

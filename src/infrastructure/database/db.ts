@@ -15,10 +15,10 @@ type Statement = {
   all: (...params: unknown[]) => unknown[];
 };
 
-type DatabaseInstance = {
+export type DatabaseInstance = {
   pragma: (setting: string) => unknown;
   close: () => void;
-  transaction: <T>(callback: (db: DatabaseInstance) => T) => (db: DatabaseInstance) => T;
+  transaction: <T>(callback: () => T) => () => T;
   prepare: (sql: string) => Statement;
   exec: (sql: string) => void;
 };
@@ -82,9 +82,9 @@ export function closeDatabase(): void {
 }
 
 // Helper untuk transaction
-export function transaction<T>(callback: (db: DatabaseInstance) => T): T {
+export function transaction<T>(callback: () => T): T {
   const database = getDatabase();
   const transactionFn = database.transaction(callback);
-  return transactionFn(database);
+  return transactionFn();
 }
 

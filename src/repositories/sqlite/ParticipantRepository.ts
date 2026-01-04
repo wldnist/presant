@@ -3,11 +3,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { Participant } from '@/types';
 import { IParticipantRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
+import { ParticipantRow } from '@/infrastructure/database/types';
 
 export class ParticipantRepository implements IParticipantRepository {
   async findAll(): Promise<Participant[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM participants ORDER BY created_at DESC').all() as any[];
+    const rows = db.prepare('SELECT * FROM participants ORDER BY created_at DESC').all() as ParticipantRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -23,7 +24,7 @@ export class ParticipantRepository implements IParticipantRepository {
 
   async findByUuid(uuid: string): Promise<Participant | null> {
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM participants WHERE uuid = ?').get(uuid) as any;
+    const row = db.prepare('SELECT * FROM participants WHERE uuid = ?').get(uuid) as ParticipantRow | undefined;
     
     if (!row) return null;
     

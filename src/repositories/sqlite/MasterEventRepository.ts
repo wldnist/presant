@@ -3,11 +3,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { MasterEvent } from '@/types';
 import { IMasterEventRepository } from '../interfaces';
 import { getDatabase } from '@/infrastructure/database/db';
+import { MasterEventRow } from '@/infrastructure/database/types';
 
 export class MasterEventRepository implements IMasterEventRepository {
   async findAll(): Promise<MasterEvent[]> {
     const db = getDatabase();
-    const rows = db.prepare('SELECT * FROM master_events ORDER BY created_at DESC').all() as any[];
+    const rows = db.prepare('SELECT * FROM master_events ORDER BY created_at DESC').all() as MasterEventRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
@@ -25,7 +26,7 @@ export class MasterEventRepository implements IMasterEventRepository {
 
   async findByUuid(uuid: string): Promise<MasterEvent | null> {
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM master_events WHERE uuid = ?').get(uuid) as any;
+    const row = db.prepare('SELECT * FROM master_events WHERE uuid = ?').get(uuid) as MasterEventRow | undefined;
     
     if (!row) return null;
     
@@ -122,7 +123,7 @@ export class MasterEventRepository implements IMasterEventRepository {
          OR LOWER(description) LIKE ?
          OR LOWER(location) LIKE ?
       ORDER BY created_at DESC
-    `).all(searchTerm, searchTerm, searchTerm) as any[];
+    `).all(searchTerm, searchTerm, searchTerm) as MasterEventRow[];
     
     return rows.map(row => ({
       id: row.id.toString(),
